@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=2]
+[gd_scene load_steps=6 format=2]
 
 [ext_resource path="res://scenes/player/Player.tscn" type="PackedScene" id=1]
+[ext_resource path="res://scenes/WorldModel.tscn" type="PackedScene" id=2]
 [ext_resource path="res://scripts/World.gd" type="Script" id=3]
 [ext_resource path="res://scenes/ui/DebugUI.tscn" type="PackedScene" id=4]
 [ext_resource path="res://scenes/ui/PlayerUi.tscn" type="PackedScene" id=5]
@@ -30,3 +31,5 @@ position = Vector2( 333.873, -17.217 )
 current = true
 zoom = Vector2( 0.5, 0.5 )
 smoothing_speed = 2.0
+
+[node name="WorldModel" parent="." instance=ExtResource( 2 )]
