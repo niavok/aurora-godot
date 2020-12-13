@@ -1,0 +1,158 @@
+[gd_scene load_steps=6 format=2]
+
+[ext_resource path="res://addons/echo_plugin/not_sticky_static_body_2d.gd" type="Script" id=1]
+[ext_resource path="res://sprites/test_home.png" type="Texture" id=2]
+[ext_resource path="res://scenes/tools/LevelExit.tscn" type="PackedScene" id=3]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 68.5559, 139.495 )
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 115.899, 79.4255 )
+
+[node name="Village" type="Node2D"]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="MainLevel" type="CanvasLayer" parent="."]
+layer = -1
+follow_viewport_enable = true
+
+[node name="Sprite" type="Sprite" parent="MainLevel"]
+texture = ExtResource( 2 )
+
+[node name="ColorRect2" type="ColorRect" parent="MainLevel"]
+margin_left = -2795.68
+margin_top = 521.024
+margin_right = 3224.32
+margin_bottom = 3614.02
+color = Color( 0, 0, 0, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ColorRect3" type="ColorRect" parent="MainLevel"]
+margin_left = -8504.0
+margin_top = -2864.0
+margin_right = -2484.0
+margin_bottom = 1540.0
+color = Color( 0, 0, 0, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ColorRect4" type="ColorRect" parent="MainLevel"]
+margin_left = 2389.98
+margin_top = -2939.5
+margin_right = 8409.98
+margin_bottom = 1464.5
+color = Color( 0, 0, 0, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Ground" type="StaticBody2D" parent="MainLevel"]
+collision_mask = 2
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+polygon = PoolVector2Array( -2389.71, 291.491, -2175.89, 325.345, -1949.6, 334.254, -1538.01, 334.254, -1352.7, 321.782, -1162.05, 327.127, -869.832, 360.981, -577.617, 407.308, -276.493, 432.253, 5.03064, 435.817, 258.046, 439.38, 518.188, 414.435, 696.368, 412.653, 917.311, 448.289, 1033.13, 451.853, 1179.23, 405.526, 1375.23, 296.837, 1546.29, 229.128, 1728.03, 127.566, 1911.55, 36.6942, 2096.86, -63.0865, 2200.2, -125.449, 2275.04, -146.831, 2351.66, -159.304, 2437.18, 790.394, 1758.32, 772.576, 430.879, 774.171, -597.225, 775.406, -2049.39, 777.151, -2690.83, 777.921, -2692.61, 318.217 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -0.840942, 0.840897 )
+polygon = PoolVector2Array( -2371.05, 388.649, -2385.3, 92.8707, -2419.15, -40.7641, -2431.63, -169.054, -2451.23, -283.089, -2477.95, -391.778, -2497.55, -527.195, -2588.42, -623.412, -2836.09, -630.539, -2843.22, 406.467 )
+
+[node name="Barrier" type="StaticBody2D" parent="MainLevel" groups=[
+"not_sticky",
+]]
+position = Vector2( -0.840942, 0.840897 )
+collision_layer = 16
+collision_mask = 2
+script = ExtResource( 1 )
+__meta__ = {
+"is_not_sticky": true
+}
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="MainLevel/Barrier"]
+polygon = PoolVector2Array( 2318.64, 89.3064, 2334.68, -382.87, 2325.77, -840.792, 2316.86, -1120.53, 2908.42, -1161.52, 2967.22, 256.795 )
+
+[node name="Ladders" type="Area2D" parent="MainLevel" groups=[
+"ladder",
+]]
+monitoring = false
+collision_layer = 8
+collision_mask = 4
+
+[node name="NoFlyZone" type="Area2D" parent="MainLevel"]
+monitoring = false
+collision_layer = 128
+collision_mask = 256
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="MainLevel/NoFlyZone"]
+polygon = PoolVector2Array( -2835.94, -417.499, -2301.97, -561.585, -1653.58, -608.202, -941.623, -599.726, 300.068, -595.488, 1423.1, -591.25, 2140.69, -1050.87, 2492.69, -1141.25, 2487.94, -1678.77, 922.939, -1669.26, -37.9404, -1635.96, -1284.23, -1578.88, -2230.84, -1545.58, -2934.85, -1388.61 )
+
+[node name="Background" type="CanvasLayer" parent="."]
+layer = -2
+
+[node name="ParallaxBackground" type="ParallaxBackground" parent="Background"]
+
+[node name="ParallaxLayer" type="ParallaxLayer" parent="Background/ParallaxBackground"]
+position = Vector2( -3.77979, 0 )
+motion_scale = Vector2( 0.3, 0.3 )
+
+[node name="ColorRect" type="ColorRect" parent="Background/ParallaxBackground/ParallaxLayer"]
+margin_left = -2777.65
+margin_top = -2579.3
+margin_right = 3242.35
+margin_bottom = 513.697
+color = Color( 0.509804, 0.647059, 0.592157, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ParallaxLayer2" type="ParallaxLayer" parent="Background/ParallaxBackground"]
+z_index = -1
+motion_scale = Vector2( 0.2, 0.2 )
+
+[node name="ParallaxLayer3" type="ParallaxLayer" parent="Background/ParallaxBackground"]
+modulate = Color( 0.803922, 0.803922, 0.803922, 0.407843 )
+z_index = -2
+motion_scale = Vector2( 0.1, 0.1 )
+
+[node name="Bubbles" type="CanvasLayer" parent="."]
+layer = 9
+follow_viewport_enable = true
+
+[node name="LevelExits" type="Node" parent="Bubbles"]
+
+[node name="home_exit" parent="Bubbles/LevelExits" instance=ExtResource( 3 )]
+position = Vector2( 2256.21, -246.805 )
+target_level_key = "TestVillage"
+target_level_entry_key = "home_exit"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bubbles/LevelExits/home_exit"]
+position = Vector2( 0, 3.1748 )
+shape = SubResource( 1 )
+
+[node name="castle_exit" parent="Bubbles/LevelExits" instance=ExtResource( 3 )]
+position = Vector2( -1788.83, 219.207 )
+target_level_key = "TestVillage"
+target_level_entry_key = "castle_exit"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bubbles/LevelExits/castle_exit"]
+position = Vector2( 1.96753, 1.81183 )
+shape = SubResource( 2 )
+
+[node name="LevelEntries" type="Node" parent="."]
+
+[node name="start_game" type="Node2D" parent="LevelEntries"]
+position = Vector2( -2199.79, 226.996 )
+
+[node name="home_exit" type="Node2D" parent="LevelEntries"]
+position = Vector2( -1795.7, 220.262 )
+
+[node name="castle_exit" type="Node2D" parent="LevelEntries"]
+position = Vector2( 2256.38, -237.703 )

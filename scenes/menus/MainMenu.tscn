@@ -1,0 +1,127 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://fonts/MenuTitleFont.tres" type="DynamicFont" id=1]
+[ext_resource path="res://fonts/MenuPrimaryButton.tres" type="DynamicFont" id=2]
+[ext_resource path="res://scripts/menus/MainMenu.gd" type="Script" id=3]
+[ext_resource path="res://scenes/menus/CreditLabel.tscn" type="PackedScene" id=4]
+
+[node name="MainMenu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 3 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 0.0588235, 0.121569, 0.160784, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="MainMenuTitleLabel" type="Label" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.1
+anchor_right = 0.1
+anchor_bottom = 0.1
+custom_fonts/font = ExtResource( 1 )
+custom_colors/font_color = Color( 0.215686, 0.517647, 0.470588, 1 )
+text = "Aurora"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ContinueGameButton" type="Button" parent="CanvasLayer"]
+visible = false
+anchor_left = 0.1
+anchor_top = 0.4
+anchor_right = 0.1
+anchor_bottom = 0.4
+margin_right = 200.0
+margin_bottom = 60.0
+rect_min_size = Vector2( 250, 50 )
+custom_fonts/font = ExtResource( 2 )
+disabled = true
+text = "Continue"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="NewGameButton" type="Button" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.5
+anchor_right = 0.1
+anchor_bottom = 0.5
+margin_right = 200.0
+margin_bottom = 60.0
+rect_min_size = Vector2( 250, 50 )
+focus_mode = 0
+custom_fonts/font = ExtResource( 2 )
+enabled_focus_mode = 0
+text = "New Game"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="LoadGameButton" type="Button" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.6
+anchor_right = 0.1
+anchor_bottom = 0.6
+margin_right = 250.0
+margin_bottom = 60.0
+rect_min_size = Vector2( 250, 50 )
+custom_fonts/font = ExtResource( 2 )
+disabled = true
+enabled_focus_mode = 0
+text = "Load Game"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="SettingsButton" type="Button" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.7
+anchor_right = 0.1
+anchor_bottom = 0.7
+margin_right = 250.0
+margin_bottom = 60.0
+rect_min_size = Vector2( 250, 50 )
+focus_mode = 0
+custom_fonts/font = ExtResource( 2 )
+enabled_focus_mode = 0
+text = "Settings"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="QuitGameButton" type="Button" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.95
+anchor_right = 0.1
+anchor_bottom = 0.95
+margin_top = -60.0
+margin_right = 250.0
+rect_min_size = Vector2( 250, 50 )
+focus_mode = 0
+custom_fonts/font = ExtResource( 2 )
+enabled_focus_mode = 0
+text = "Quit"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CreditLabel" parent="CanvasLayer" instance=ExtResource( 4 )]
+anchor_left = 0.95
+anchor_top = 0.95
+anchor_right = 0.95
+anchor_bottom = 0.95
+[connection signal="pressed" from="CanvasLayer/NewGameButton" to="." method="_on_NewGameButton_pressed"]
+[connection signal="pressed" from="CanvasLayer/SettingsButton" to="." method="_on_SettingsButton_pressed"]
+[connection signal="pressed" from="CanvasLayer/QuitGameButton" to="." method="_on_QuitGameButton_pressed"]

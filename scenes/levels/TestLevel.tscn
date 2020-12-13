@@ -1,0 +1,62 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://sprites/demo_area.png" type="Texture" id=1]
+[ext_resource path="res://scenes/tools/LevelExit.tscn" type="PackedScene" id=2]
+
+[sub_resource type="CircleShape2D" id=1]
+radius = 68.0808
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 60.3611, 99.0237 )
+
+[node name="Village" type="Node2D"]
+position = Vector2( 385.759, 48.1085 )
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+position = Vector2( -32.0724, 212.034 )
+shape = SubResource( 1 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="StaticBody2D"]
+position = Vector2( 141.968, 226.725 )
+polygon = PoolVector2Array( 60.191, -1.74806, 235.097, -0.0662689, 332.641, -2.58896, 464.662, -3.42986, 532.775, -1.74806, 542.866, 25.1606, 547.07, 77.2962, 536.979, 84.0234, 457.935, 98.3186, 414.208, 97.4777, 328.437, 103.364, 234.257, 109.25, 185.485, 114.296, 87.9406, 119.341, 34.1233, 122.705, -0.353516, 126.068, 4.69186, -2.58896 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="StaticBody2D"]
+polygon = PoolVector2Array( 74.2561, 60.1906, 105.754, 52.631, 141.662, 52.631, 166.23, 58.9307, 185.129, 72.1598, 191.429, 87.9088, 188.909, 113.737, 180.719, 128.856, 159.931, 142.715, 135.992, 143.975, 108.904, 140.826, 84.9654, 127.596, 74.8861, 112.477, 62.9168, 94.8384, 64.1767, 77.8295 )
+
+[node name="CollisionPolygon2D3" type="CollisionPolygon2D" parent="StaticBody2D"]
+polygon = PoolVector2Array( 421.994, 89.7987, 466.092, 70.8999, 500.739, 56.4108, 532.867, 48.8513, 567.515, 37.512, 638.071, 2.2342, 646.89, 30.5824, 648.78, 65.8602, 638.071, 91.0586, 616.652, 110.587, 568.775, 120.667, 509.559, 127.596, 459.792, 123.817, 418.845, 116.887, 405.615, 104.918, 404.985, 99.2481 )
+
+[node name="CollisionPolygon2D4" type="CollisionPolygon2D" parent="StaticBody2D"]
+polygon = PoolVector2Array( -3.74814, 484.405, 39.7028, 491.148, 100.384, 488.9, 149.079, 478.412, 197.774, 476.914, 270.442, 482.158, 344.608, 480.66, 436.754, 473.168, 510.171, 470.921, 621.795, 477.663, 695.212, 479.911, 762.636, 467.175, 796.348, 452.941, 799.345, 599.026, -4.4973, 598.277 )
+
+[node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="StaticBody2D"]
+polygon = PoolVector2Array( -117.759, 439.892, -317.759, 442.892, -383.759, 425.892, -417.759, 401.892, -458.759, 366.892, -478.759, 312.892, -509.759, 213.891, -515.759, 119.891, -472.759, 95.8915, -423.759, 75.8915, -363.759, 85.8915, -312.759, 103.891, -291.759, 123.891, -241.759, 103.891, -266.759, 47.8915, -339.759, 10.8915, -402.759, 7.8915, -484.759, 15.8915, -547.759, 37.8915, -625.759, 102.891, -660.759, 206.891, -659.759, 288.892, -621.759, 415.892, -560.759, 507.892, -458.759, 536.891, -343.759, 552.891, -230.759, 564.891, -157.759, 553.891, -121.759, 534.891 )
+
+[node name="Sprite" type="Sprite" parent="."]
+position = Vector2( 398.315, 298.264 )
+scale = Vector2( 0.500681, 0.500681 )
+texture = ExtResource( 1 )
+
+[node name="LevelEntries" type="Node" parent="."]
+
+[node name="entry_1" type="Node2D" parent="LevelEntries"]
+position = Vector2( 510.923, 52.4407 )
+
+[node name="entry_2" type="Node2D" parent="LevelEntries"]
+position = Vector2( 1090.77, 458.482 )
+
+[node name="Bubbles" type="CanvasLayer" parent="."]
+layer = 9
+follow_viewport_enable = true
+
+[node name="LevelExits" type="Node" parent="Bubbles"]
+
+[node name="ExitToTestVillage_start" parent="Bubbles/LevelExits" instance=ExtResource( 2 )]
+position = Vector2( 141.111, 380.496 )
+target_level_key = "TestVillage"
+target_level_entry_key = "start_game"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bubbles/LevelExits/ExitToTestVillage_start"]
+shape = SubResource( 2 )

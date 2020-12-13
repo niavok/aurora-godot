@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://scenes/player/Player.tscn" type="PackedScene" id=1]
+[ext_resource path="res://scripts/World.gd" type="Script" id=3]
+[ext_resource path="res://scenes/ui/DebugUI.tscn" type="PackedScene" id=4]
+[ext_resource path="res://scenes/ui/PlayerUi.tscn" type="PackedScene" id=5]
+
+[node name="World" type="Node2D"]
+pause_mode = 2
+position = Vector2( -1.68176, 0 )
+script = ExtResource( 3 )
+
+[node name="GuiLayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="DebugUI" parent="GuiLayer" instance=ExtResource( 4 )]
+
+[node name="PlayerUi" parent="GuiLayer" instance=ExtResource( 5 )]
+player_node_path = NodePath("../../PlayerLayer/Player")
+
+[node name="PlayerLayer" type="CanvasLayer" parent="."]
+layer = 0
+follow_viewport_enable = true
+
+[node name="Player" parent="PlayerLayer" instance=ExtResource( 1 )]
+position = Vector2( 76.7489, -44.5611 )
+
+[node name="Camera2D" type="Camera2D" parent="PlayerLayer/Player"]
+position = Vector2( 333.873, -17.217 )
+current = true
+zoom = Vector2( 0.5, 0.5 )
+smoothing_speed = 2.0

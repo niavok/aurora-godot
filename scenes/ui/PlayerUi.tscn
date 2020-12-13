@@ -1,0 +1,35 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://scripts/PlayerUi.gd" type="Script" id=1]
+
+[node name="PlayerUi" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 13.9221
+margin_top = 1.73846
+margin_right = 13.9221
+margin_bottom = 1.73853
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="StaminaLabel" type="Label" parent="."]
+margin_left = -2.0
+margin_top = 22.0
+margin_right = 49.0
+margin_bottom = 36.0
+text = "Stamina"
+
+[node name="StaminaProgressBar" type="ProgressBar" parent="."]
+margin_left = 57.1591
+margin_top = 17.409
+margin_right = 225.159
+margin_bottom = 40.409
+size_flags_horizontal = 3
+size_flags_vertical = 1
+value = 30.0
+percent_visible = false
+__meta__ = {
+"_edit_use_anchors_": false
+}

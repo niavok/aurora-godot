@@ -1,0 +1,261 @@
+[gd_scene load_steps=18 format=2]
+
+[ext_resource path="res://addons/echo_plugin/not_sticky_static_body_2d.gd" type="Script" id=1]
+[ext_resource path="res://sprites/demo_area.png" type="Texture" id=2]
+[ext_resource path="res://scenes/tools/LevelExit.tscn" type="PackedScene" id=3]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 10000, 100 )
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 2000, 100 )
+
+[sub_resource type="RectangleShape2D" id=3]
+extents = Vector2( 100, 2000 )
+
+[sub_resource type="CapsuleShape2D" id=4]
+radius = 100.0
+height = 1000.0
+
+[sub_resource type="CircleShape2D" id=5]
+radius = 68.0808
+
+[sub_resource type="CapsuleShape2D" id=6]
+radius = 42.1745
+height = 139.525
+
+[sub_resource type="CapsuleShape2D" id=7]
+height = 619.045
+
+[sub_resource type="RectangleShape2D" id=8]
+extents = Vector2( 27.6643, 293.094 )
+
+[sub_resource type="RectangleShape2D" id=9]
+extents = Vector2( 19.2409, 455.699 )
+
+[sub_resource type="RectangleShape2D" id=10]
+extents = Vector2( 39.4216, 10 )
+
+[sub_resource type="RectangleShape2D" id=11]
+extents = Vector2( 180.105, 135.463 )
+
+[sub_resource type="RectangleShape2D" id=12]
+extents = Vector2( 60.3611, 99.0237 )
+
+[sub_resource type="RectangleShape2D" id=13]
+extents = Vector2( 60.3611, 79.4255 )
+
+[sub_resource type="RectangleShape2D" id=14]
+extents = Vector2( 60.3611, 79.4255 )
+
+[node name="Village" type="Node2D"]
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="MainLevel" type="CanvasLayer" parent="."]
+layer = -1
+follow_viewport_enable = true
+
+[node name="Ground" type="StaticBody2D" parent="MainLevel"]
+collision_mask = 2
+__meta__ = {
+"_edit_lock_": true
+}
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MainLevel/Ground"]
+position = Vector2( 0, 100 )
+shape = SubResource( 1 )
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="MainLevel/Ground"]
+position = Vector2( -9995.1, -1748.29 )
+rotation = 1.5708
+shape = SubResource( 2 )
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="MainLevel/Ground"]
+position = Vector2( 10358.3, -1714.38 )
+rotation = 0.253073
+shape = SubResource( 3 )
+
+[node name="CollisionShape2D4" type="CollisionShape2D" parent="MainLevel/Ground"]
+position = Vector2( 1133.03, -354.921 )
+rotation = 1.34565
+shape = SubResource( 4 )
+
+[node name="CollisionShape2D5" type="CollisionShape2D" parent="MainLevel/Ground"]
+position = Vector2( 53.4538, -529.194 )
+shape = SubResource( 5 )
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -95.0111, -302.469 )
+polygon = PoolVector2Array( 60.191, -1.74806, 235.097, -0.0662689, 332.641, -2.58896, 464.662, -3.42986, 532.775, -1.74806, 542.866, 25.1606, 547.07, 77.2962, 536.979, 84.0234, 457.935, 98.3186, 414.208, 97.4777, 328.437, 103.364, 234.257, 109.25, 185.485, 114.296, 87.9406, 119.341, 34.1233, 122.705, -0.353516, 126.068, 4.69186, -2.58896 )
+
+[node name="CollisionPolygon2D6" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -1630.92, -288.215 )
+polygon = PoolVector2Array( 60.191, -1.74806, 235.097, -0.0662689, 332.641, -2.58896, 464.662, -3.42986, 532.775, -1.74806, 542.866, 25.1606, 547.07, 77.2962, 536.979, 84.0234, 457.935, 98.3186, 414.208, 97.4777, 328.437, 103.364, 234.257, 109.25, 185.485, 114.296, 87.9406, 119.341, 34.1233, 122.705, -0.353516, 126.068, 4.69186, -2.58896 )
+
+[node name="CollisionPolygon2D7" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -1803.75, -514.503 )
+polygon = PoolVector2Array( 60.191, -1.74806, 235.097, -0.0662689, 332.641, -2.58896, 464.662, -3.42986, 532.775, -1.74806, 542.866, 25.1606, 547.07, 77.2962, 536.979, 84.0234, 457.935, 98.3186, 414.208, 97.4777, 328.437, 103.364, 234.257, 109.25, 185.485, 114.296, 87.9406, 119.341, 34.1233, 122.705, -0.353516, 126.068, 4.69186, -2.58896 )
+
+[node name="CollisionPolygon2D8" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -2147.64, -277.524 )
+polygon = PoolVector2Array( 60.191, -1.74806, 235.097, -0.0662689, 332.641, -2.58896, 464.662, -3.42986, 532.775, -1.74806, 542.866, 25.1606, 547.07, 77.2962, 536.979, 84.0234, 457.935, 98.3186, 414.208, 97.4777, 328.437, 103.364, 234.257, 109.25, 185.485, 114.296, 87.9406, 119.341, 34.1233, 122.705, -0.353516, 126.068, 4.69186, -2.58896 )
+
+[node name="CollisionPolygon2D9" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -2281.28, -496.685 )
+polygon = PoolVector2Array( 60.191, -1.74806, 235.097, -0.0662689, 332.641, -2.58896, 464.662, -3.42986, 532.775, -1.74806, 542.866, 25.1606, 547.07, 77.2962, 536.979, 84.0234, 457.935, 98.3186, 414.208, 97.4777, 328.437, 103.364, 234.257, 109.25, 185.485, 114.296, 87.9406, 119.341, 34.1233, 122.705, -0.353516, 126.068, 4.69186, -2.58896 )
+
+[node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -324.287, -757.264 )
+polygon = PoolVector2Array( 74.2561, 60.1906, 105.754, 52.631, 141.662, 52.631, 166.23, 58.9307, 185.129, 72.1598, 191.429, 87.9088, 188.909, 113.737, 180.719, 128.856, 159.931, 142.715, 135.992, 143.975, 108.904, 140.826, 84.9654, 127.596, 74.8861, 112.477, 62.9168, 94.8384, 64.1767, 77.8295 )
+
+[node name="CollisionPolygon2D3" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -181.743, -755.482 )
+polygon = PoolVector2Array( 421.994, 89.7987, 466.092, 70.8999, 500.739, 56.4108, 532.867, 48.8513, 567.515, 37.512, 638.071, 2.2342, 646.89, 30.5824, 648.78, 65.8602, 638.071, 91.0586, 616.652, 110.587, 568.775, 120.667, 509.559, 127.596, 459.792, 123.817, 418.845, 116.887, 405.615, 104.918, 404.985, 99.2481 )
+
+[node name="CollisionPolygon2D4" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( 745.034, -1300.03 )
+polygon = PoolVector2Array( -3.74814, 484.405, 39.7028, 491.148, 100.384, 488.9, 149.079, 478.412, 197.774, 476.914, 270.442, 482.158, 344.608, 480.66, 436.754, 473.168, 510.171, 470.921, 621.795, 477.663, 695.212, 479.911, 762.636, 467.175, 796.348, 452.941, 799.345, 599.026, -4.4973, 598.277 )
+
+[node name="CollisionPolygon2D10" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( 751.762, -1611.16 )
+polygon = PoolVector2Array( -3.74814, 484.405, 39.7028, 491.148, 100.384, 488.9, 149.079, 478.412, 197.774, 476.914, 270.442, 482.158, 344.608, 480.66, 436.754, 473.168, 510.171, 470.921, 621.795, 477.663, 695.212, 479.911, 762.636, 467.175, 796.348, 452.941, 799.345, 599.026, -4.4973, 598.277 )
+
+[node name="CollisionPolygon2D12" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( 1629.68, -1643.41 )
+polygon = PoolVector2Array( -3.74814, 484.405, 39.7028, 491.148, 100.384, 488.9, 149.079, 478.412, 197.774, 476.914, 270.442, 482.158, 344.608, 480.66, 436.754, 473.168, 510.171, 470.921, 621.795, 477.663, 695.212, 479.911, 762.636, 467.175, 796.348, 452.941, 799.345, 599.026, -4.4973, 598.277 )
+
+[node name="CollisionPolygon2D11" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -107.635, -1577.52 )
+polygon = PoolVector2Array( -3.74814, 484.405, 39.7028, 491.148, 100.384, 488.9, 149.079, 478.412, 197.774, 476.914, 270.442, 482.158, 344.608, 480.66, 436.754, 473.168, 510.171, 470.921, 621.795, 477.663, 695.212, 479.911, 762.636, 467.175, 796.348, 452.941, 799.345, 599.026, -4.4973, 598.277 )
+
+[node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="MainLevel/Ground"]
+position = Vector2( -267.27, -898.026 )
+polygon = PoolVector2Array( -117.759, 439.892, -317.759, 442.892, -383.759, 425.892, -417.759, 401.892, -458.759, 366.892, -478.759, 312.892, -509.759, 213.891, -515.759, 119.891, -472.759, 95.8915, -423.759, 75.8915, -363.759, 85.8915, -312.759, 103.891, -291.759, 123.891, -241.759, 103.891, -266.759, 47.8915, -339.759, 10.8915, -402.759, 7.8915, -484.759, 15.8915, -547.759, 37.8915, -625.759, 102.891, -660.759, 206.891, -659.759, 288.892, -621.759, 415.892, -560.759, 507.892, -458.759, 536.891, -343.759, 552.891, -230.759, 564.891, -157.759, 553.891, -121.759, 534.891 )
+
+[node name="CollisionShape2D6" type="CollisionShape2D" parent="MainLevel/Ground"]
+position = Vector2( -330.472, -24.386 )
+shape = SubResource( 6 )
+
+[node name="Barrier" type="StaticBody2D" parent="MainLevel" groups=[
+"not_sticky",
+]]
+position = Vector2( -0.840942, 0.840897 )
+collision_layer = 16
+collision_mask = 2
+script = ExtResource( 1 )
+__meta__ = {
+"is_not_sticky": true
+}
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MainLevel/Barrier"]
+position = Vector2( -783.989, -28.7905 )
+shape = SubResource( 6 )
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="MainLevel/Barrier"]
+position = Vector2( -2881.28, -253.433 )
+shape = SubResource( 7 )
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="MainLevel/Barrier"]
+position = Vector2( -2705.72, -389.351 )
+shape = SubResource( 8 )
+
+[node name="Ladders" type="Area2D" parent="MainLevel" groups=[
+"ladder",
+]]
+monitoring = false
+collision_layer = 8
+collision_mask = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MainLevel/Ladders"]
+position = Vector2( 718.126, -776.988 )
+shape = SubResource( 9 )
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="MainLevel/Ladders"]
+position = Vector2( 1583.06, -1194.37 )
+shape = SubResource( 10 )
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="MainLevel/Ladders"]
+position = Vector2( 1191.95, -1393.04 )
+shape = SubResource( 11 )
+
+[node name="Background" type="CanvasLayer" parent="."]
+layer = -2
+
+[node name="ParallaxBackground" type="ParallaxBackground" parent="Background"]
+
+[node name="ParallaxLayer" type="ParallaxLayer" parent="Background/ParallaxBackground"]
+visible = false
+modulate = Color( 0.435294, 0.435294, 0.435294, 1 )
+position = Vector2( -3.77979, 0 )
+motion_scale = Vector2( 0.3, 0.3 )
+
+[node name="Sprite" type="Sprite" parent="Background/ParallaxBackground/ParallaxLayer"]
+position = Vector2( -10.7092, -396.929 )
+texture = ExtResource( 2 )
+region_enabled = true
+region_rect = Rect2( 0, 0, 10000, 2000 )
+
+[node name="ParallaxLayer2" type="ParallaxLayer" parent="Background/ParallaxBackground"]
+visible = false
+z_index = -1
+motion_scale = Vector2( 0.2, 0.2 )
+
+[node name="Sprite" type="Sprite" parent="Background/ParallaxBackground/ParallaxLayer2"]
+modulate = Color( 0.337255, 0.247059, 0.247059, 1 )
+scale = Vector2( 0.8, 0.8 )
+texture = ExtResource( 2 )
+flip_h = true
+flip_v = true
+region_enabled = true
+region_rect = Rect2( 0, 0, 15000, 4000 )
+
+[node name="ParallaxLayer3" type="ParallaxLayer" parent="Background/ParallaxBackground"]
+visible = false
+modulate = Color( 0.803922, 0.803922, 0.803922, 0.407843 )
+z_index = -2
+motion_scale = Vector2( 0.1, 0.1 )
+
+[node name="Sprite" type="Sprite" parent="Background/ParallaxBackground/ParallaxLayer3"]
+scale = Vector2( 0.6, 0.6 )
+texture = ExtResource( 2 )
+region_enabled = true
+region_rect = Rect2( 0, 0, 10000, 2000 )
+
+[node name="Bubbles" type="CanvasLayer" parent="."]
+layer = 9
+follow_viewport_enable = true
+
+[node name="LevelExits" type="Node" parent="Bubbles"]
+
+[node name="ExitToTestVillage_start" parent="Bubbles/LevelExits" instance=ExtResource( 3 )]
+position = Vector2( 2352.87, -1255.11 )
+target_level_key = "TestVillage"
+target_level_entry_key = "start_game"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bubbles/LevelExits/ExitToTestVillage_start"]
+shape = SubResource( 12 )
+
+[node name="ExitToTestLevel_1" parent="Bubbles/LevelExits" instance=ExtResource( 3 )]
+position = Vector2( 1480.85, -917.518 )
+target_level_key = "TestLevel"
+target_level_entry_key = "entry_1"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bubbles/LevelExits/ExitToTestLevel_1"]
+position = Vector2( 0, 3.1748 )
+shape = SubResource( 13 )
+
+[node name="ExitToTestLevel_2" parent="Bubbles/LevelExits" instance=ExtResource( 3 )]
+position = Vector2( 1474.35, -587.075 )
+target_level_key = "TestLevel"
+target_level_entry_key = "entry_2"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bubbles/LevelExits/ExitToTestLevel_2"]
+position = Vector2( 1.96753, 1.81183 )
+shape = SubResource( 14 )
+
+[node name="LevelEntries" type="Node" parent="."]
+
+[node name="start_game" type="Node2D" parent="LevelEntries"]
+position = Vector2( -534.056, -495.869 )

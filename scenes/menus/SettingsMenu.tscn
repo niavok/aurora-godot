@@ -1,0 +1,148 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://scripts/menus/SettingsMenu.gd" type="Script" id=1]
+[ext_resource path="res://fonts/MenuTitleFont.tres" type="DynamicFont" id=2]
+[ext_resource path="res://fonts/MenuPrimaryButton.tres" type="DynamicFont" id=3]
+[ext_resource path="res://scenes/menus/CreditLabel.tscn" type="PackedScene" id=4]
+
+[node name="SettingsMenu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+layer = 12
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 0.0588235, 0.121569, 0.160784, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="MainMenuTitleLabel" type="Label" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.1
+anchor_right = 0.1
+anchor_bottom = 0.1
+custom_fonts/font = ExtResource( 2 )
+custom_colors/font_color = Color( 0.215686, 0.517647, 0.470588, 1 )
+text = "Settings"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="BackButton" type="Button" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.95
+anchor_right = 0.1
+anchor_bottom = 0.95
+margin_top = -60.0
+margin_right = 250.0
+rect_min_size = Vector2( 250, 50 )
+focus_mode = 0
+custom_fonts/font = ExtResource( 3 )
+enabled_focus_mode = 0
+text = "Back"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CreditLabel" parent="CanvasLayer" instance=ExtResource( 4 )]
+anchor_left = 0.95
+anchor_top = 0.95
+anchor_right = 0.95
+anchor_bottom = 0.95
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer"]
+anchor_left = 0.1
+anchor_top = 0.3
+anchor_right = 0.9
+anchor_bottom = 0.85
+margin_right = 12.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/ScrollContainer"]
+margin_right = 565.0
+margin_bottom = 147.0
+
+[node name="ContinueOnStartButton" type="CheckButton" parent="CanvasLayer/ScrollContainer/VBoxContainer"]
+margin_right = 565.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 250, 50 )
+focus_mode = 0
+custom_fonts/font = ExtResource( 3 )
+enabled_focus_mode = 0
+text = "Continue by default"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="FullScreenButton" type="CheckButton" parent="CanvasLayer/ScrollContainer/VBoxContainer"]
+margin_top = 54.0
+margin_right = 565.0
+margin_bottom = 104.0
+rect_min_size = Vector2( 250, 50 )
+focus_mode = 0
+custom_fonts/font = ExtResource( 3 )
+enabled_focus_mode = 0
+text = "Fullscreen"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/ScrollContainer/VBoxContainer"]
+margin_top = 108.0
+margin_right = 565.0
+margin_bottom = 147.0
+custom_constants/separation = 20
+
+[node name="DisplayScreenLabel" type="Label" parent="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer"]
+margin_right = 217.0
+margin_bottom = 39.0
+custom_fonts/font = ExtResource( 3 )
+text = "Display screen"
+
+[node name="DisplayScreenButton1" type="Button" parent="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer"]
+margin_left = 237.0
+margin_right = 304.0
+margin_bottom = 39.0
+toggle_mode = true
+pressed = true
+text = "Screen 1"
+
+[node name="DisplayScreenButton2" type="Button" parent="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer"]
+margin_left = 324.0
+margin_right = 391.0
+margin_bottom = 39.0
+toggle_mode = true
+text = "Screen 2"
+
+[node name="DisplayScreenButton3" type="Button" parent="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer"]
+margin_left = 411.0
+margin_right = 478.0
+margin_bottom = 39.0
+toggle_mode = true
+text = "Screen 3"
+
+[node name="DisplayScreenButton4" type="Button" parent="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer"]
+margin_left = 498.0
+margin_right = 565.0
+margin_bottom = 39.0
+toggle_mode = true
+text = "Screen 4"
+[connection signal="pressed" from="CanvasLayer/BackButton" to="." method="_on_BackButton_pressed"]
+[connection signal="toggled" from="CanvasLayer/ScrollContainer/VBoxContainer/ContinueOnStartButton" to="." method="_on_ContinueOnStartButton_toggled"]
+[connection signal="toggled" from="CanvasLayer/ScrollContainer/VBoxContainer/FullScreenButton" to="." method="_on_FullScreenButton_toggled"]
+[connection signal="toggled" from="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer/DisplayScreenButton1" to="." method="_on_DisplayScreenButton_toggled" binds= [ 0 ]]
+[connection signal="toggled" from="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer/DisplayScreenButton2" to="." method="_on_DisplayScreenButton_toggled" binds= [ 1 ]]
+[connection signal="toggled" from="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer/DisplayScreenButton3" to="." method="_on_DisplayScreenButton_toggled" binds= [ 2 ]]
+[connection signal="toggled" from="CanvasLayer/ScrollContainer/VBoxContainer/HBoxContainer/DisplayScreenButton4" to="." method="_on_DisplayScreenButton_toggled" binds= [ 3 ]]
