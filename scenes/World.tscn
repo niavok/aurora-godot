@@ -29,7 +29,6 @@ position = Vector2( 76.7489, -44.5611 )
 [node name="Camera2D" type="Camera2D" parent="PlayerLayer/Player"]
 position = Vector2( 333.873, -17.217 )
 current = true
-zoom = Vector2( 0.5, 0.5 )
 smoothing_speed = 2.0
 
 [node name="WorldModel" parent="." instance=ExtResource( 2 )]
