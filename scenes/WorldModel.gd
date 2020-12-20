@@ -1,13 +1,20 @@
 extends Node2D
 
-const WORLD_BLOCK_SIZE = 20.0*10
+const WORLD_BLOCK_SIZE = 1000
 #const WORLD_BLOCK_DEPTH = 1000.0
 const WORLD_BLOCK_DEPTH = 1.0
 const WORLD_BLOCK_INTERFACE_SECTION = WORLD_BLOCK_SIZE * WORLD_BLOCK_DEPTH
-const WORLD_BLOCK_COUNT_X = 500/10
-const WORLD_BLOCK_COUNT_Y = 100/10
+const WORLD_BLOCK_COUNT_X = 10
+const WORLD_BLOCK_COUNT_Y = 50
 const WORLD_BLOCK_COUNT = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_COUNT_Y
 const WORLD_SIZE = Vector2(WORLD_BLOCK_SIZE * WORLD_BLOCK_COUNT_X, WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_COUNT_Y)
+
+
+const RENDER_DEBUG_SCALE = 0.04
+const RENDER_DEBUG_VELOCITY_SCALE = 15
+const RENDER_DEBUG_OFFSET = Vector2(-2200, -1700)
+
+
 
 const blocks = []
 
@@ -51,6 +58,7 @@ class Block:
 	var give_volume_orders = []
 	var velocity_cache
 	var velocity_amplitude
+	var pressure_gradient
 
 	func init_empty():
 		input_internal_energy = 0
@@ -108,6 +116,7 @@ class Block:
 		if N == 0:
 			pressure = 0
 			temperature = 0
+			pressure_gradient = 0
 		else:
 			if input_mass == 0:
 				input_thermal_energy = 0
@@ -134,6 +143,8 @@ class Block:
 			var thermal_energy = input_thermal_energy + output_thermal_energy;
 
 			temperature = thermal_energy / energy_per_k
+			var density = mass / gas_volume
+			pressure_gradient = density * PhysicalConstants.gravity
 
 		if kinetic_energy > 0:
 			velocity_amplitude = sqrt(kinetic_energy * 2 / mass)
@@ -283,7 +294,7 @@ class Block:
 
 	func draw_debug_tile(canvas : CanvasItem, pos : Vector2):
 
-		var pressure_opacity = clamp(pressure / (100000*10.0), 0.0, 1.0)
+		var pressure_opacity = clamp(pressure / (100000*1.0), 0.0, 1.0)
 		var temperature_red = clamp(temperature / 3000.0, 0.0, 1.0)
 
 		var color = Color(temperature_red, 0.5, 1.0, pressure_opacity)
@@ -293,15 +304,11 @@ class Block:
 		#var temp_text = String.format("%10.3f" % temperature)
 
 		var temp_text = "%10.1f" % temperature
-		var pressure_text = "%10.1f" % ((pressure-100000))
+		#var pressure_text = "%10.1f" % ((pressure-100000))
+		var pressure_text = "%10.2f" % (pressure/100000)
 
 		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(0, 10), temp_text, Color(1.0,1.0,1.0,1.0))
 		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(0, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
-
-
-const RENDER_DEBUG_SCALE = 0.3
-const RENDER_DEBUG_VELOCITY_SCALE = 15
-const RENDER_DEBUG_OFFSET = Vector2(-2200, 0)
 
 
 class AtmosphericBlock extends Block:
@@ -309,7 +316,8 @@ class AtmosphericBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 274, 1e5)
+		#init_with_gas(PhysicalConstants.Gas.Nitrogen, 274, 1e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 300, 0.13e5)
 
 	func draw(canvas : CanvasItem, pos : Vector2):
 		draw_debug_tile(canvas, pos)
@@ -322,7 +330,7 @@ class GroundBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 274, 1e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 300, 0.13e5)
 		# TODO proportionnal
 
 	func draw(canvas : CanvasItem, pos : Vector2):
@@ -335,7 +343,7 @@ class SurfaceBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 274, 1e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 300, 0.13e5)
 		# TODO depend on ground composition
 
 	func draw(canvas : CanvasItem, pos : Vector2):
@@ -428,11 +436,17 @@ func _process(delta):
 		var total_elastic_energy = 0
 		var total_thermal_energy = 0
 
+		var total_gas_N = []
+		for gas in range(PhysicalConstants.Gas.Count):
+			total_gas_N.append(0)
+
 		for block in blocks:
 			total_internal_energy += block.input_internal_energy + block.output_internal_energy
 			total_thermal_energy += block.input_thermal_energy + block.output_thermal_energy
 			total_elastic_energy += block.input_elastic_energy + block.output_elastic_energy
 			total_kinetic_energy += block.kinetic_energy
+			for gas in range(PhysicalConstants.Gas.Count):
+				total_gas_N[gas] += block.input_gas_composition_N[gas] + block.output_gas_composition_N[gas]
 
 		var total_energy = total_internal_energy + total_kinetic_energy
 
@@ -441,6 +455,9 @@ func _process(delta):
 		print("total_kinetic_energy %s MJ" % (total_kinetic_energy/ 1e6))
 		print("total_thermal_energy %s TJ" % (total_thermal_energy/ 1e9))
 		print("total_elastic_energy %s TJ" % (total_elastic_energy/ 1e9))
+		print("total_gas N:")
+		for gas in range(PhysicalConstants.Gas.Count):
+			print("- %s Mmol" % (total_gas_N[gas] / 1e6) )
 		print("total_energy %s TJ" % (total_energy/ 1e9))
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -454,7 +471,7 @@ func process_world(userdata):
 func step_world(delta_time):
 
 	var first_block = blocks[0]
-	print("step world model")
+	#print("step world model")
 
 	# compute pressure again ?
 
@@ -479,12 +496,15 @@ func step_world(delta_time):
 	# https://fr.wikipedia.org/wiki/Loi_de_distribution_des_vitesses_de_Maxwell
 	# elastique energy
 
-func get_relative_force(block_x : int, block_y : int, dx : int, dy: int, dir_and_coef : Vector2, pressure : float):
+func get_relative_force(block_x : int, block_y : int, dx : int, dy: int, dir_and_coef : Vector2, local_block : Block):
 	var neightbourg_block : Block = get_block_at_with_wrapping(block_x + dx, block_y + dy)
 	if not neightbourg_block:
 		return Vector2()
 
-	var delta_pressure = neightbourg_block.pressure - pressure # Pa
+	var local_pressure_at_altitude = local_block.pressure + local_block.pressure_gradient * dy * WORLD_BLOCK_SIZE *0.5
+	var neightbourg_pressure_at_altitude = neightbourg_block.pressure - neightbourg_block.pressure_gradient * dy * WORLD_BLOCK_SIZE *0.5
+
+	var delta_pressure = neightbourg_pressure_at_altitude - local_pressure_at_altitude # Pa
 	var force = delta_pressure * WORLD_BLOCK_INTERFACE_SECTION  # Pa * m2 = N
 	var directional_force = force * dir_and_coef
 	return directional_force
@@ -494,17 +514,16 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 
 	var forces = Vector2()
 
-	var pressure = block.pressure
 	if block.mass > 0:
-		forces += get_relative_force(block_x, block_y, -1, -1, Vector2( 0.5, 0.5), pressure)
-		forces += get_relative_force(block_x, block_y,  1, -1, Vector2(-0.5, 0.5), pressure)
-		forces += get_relative_force(block_x, block_y,  1,  1, Vector2(-0.5,-0.5), pressure)
-		forces += get_relative_force(block_x, block_y, -1,  1, Vector2( 0.5,-0.5), pressure)
+		forces += get_relative_force(block_x, block_y, -1, -1, Vector2( 0.5, 0.5), block)
+		forces += get_relative_force(block_x, block_y,  1, -1, Vector2(-0.5, 0.5), block)
+		forces += get_relative_force(block_x, block_y,  1,  1, Vector2(-0.5,-0.5), block)
+		forces += get_relative_force(block_x, block_y, -1,  1, Vector2( 0.5,-0.5), block)
 
-		forces += get_relative_force(block_x, block_y,  1,  0, Vector2(-1,0), pressure)
-		forces += get_relative_force(block_x, block_y, -1,  0, Vector2(1,0), pressure)
-		forces += get_relative_force(block_x, block_y,  0,  1, Vector2(0,-1), pressure)
-		forces += get_relative_force(block_x, block_y,  0, -1, Vector2(0,1), pressure)
+		forces += get_relative_force(block_x, block_y,  1,  0, Vector2(-1,0), block)
+		forces += get_relative_force(block_x, block_y, -1,  0, Vector2(1,0), block)
+		forces += get_relative_force(block_x, block_y,  0,  1, Vector2(0,-1), block)
+		forces += get_relative_force(block_x, block_y,  0, -1, Vector2(0,1), block)
 
 
 		var forces_acceleration = forces / block.mass
@@ -515,7 +534,7 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 		var new_velocity = block.velocity_cache + acceleration * delta_time
 
 		# debug dumping
-		new_velocity *= 0.9
+		new_velocity *= 0.95
 
 
 		var top_block = get_block_at_with_wrapping(block_x, block_y -1)

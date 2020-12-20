@@ -8,7 +8,7 @@ var gravity = 9.81 # m.s-2
 enum Gas {
 	#Hydrogen, #H2
 	Nitrogen, #N2
-	#Oxygen, #O2
+	Oxygen, #O2
 	#Water,  #H2O
 	#Methane, #CH4
 	#CarbonDioxide, #CO2
@@ -35,6 +35,11 @@ func _ready():
 	gas = Gas.Nitrogen
 	gas_specific_heat[gas] = 1040.0
 	gas_mass_by_mole[gas] = 0.0280134
+
+	# O2
+	gas = Gas.Oxygen
+	gas_specific_heat[gas] = 918.0
+	gas_mass_by_mole[gas] = 0.0319988
 
 	for i in range(Gas.Count):
 		gas_specific_heat_by_mole[i] = gas_specific_heat[i] * gas_mass_by_mole[i]

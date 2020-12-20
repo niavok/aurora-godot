@@ -23,7 +23,7 @@ const JUMP_VELOCITY_PER_SEC = 2000
 
 
 const MAX_STAMINA = 100.0
-const STAMINA_REGEN_PER_SEC = 15.0
+const STAMINA_REGEN_PER_SEC = 150.0
 const STAMINA_SPRINT_PER_SEC = 30
 const STAMINA_FLY_PER_SEC = 25
 const STAMINA_FLY_ACCELERATION_PER_SEC = 5
@@ -323,8 +323,8 @@ func free_movement(delta) -> float:
 	if no_fly_zone_detector.get_overlapping_areas().size() > 0:
 		time_in_no_fly_zone += delta
 		# no fly zone
-		velocity.y +=  FLY_ACCELERATION * time_in_no_fly_zone * 0.05
-		velocity.x +=  FLY_ACCELERATION * time_in_no_fly_zone * rng.randfn(0, 0.2)
+#		velocity.y +=  FLY_ACCELERATION * time_in_no_fly_zone * 0.05
+#		velocity.x +=  FLY_ACCELERATION * time_in_no_fly_zone * rng.randfn(0, 0.2)
 	else:
 		time_in_no_fly_zone = 0
 
