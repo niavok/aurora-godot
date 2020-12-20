@@ -6,6 +6,8 @@ const WORLD_BLOCK_DEPTH = 1.0
 const WORLD_BLOCK_INTERFACE_SECTION = WORLD_BLOCK_SIZE * WORLD_BLOCK_DEPTH
 const WORLD_BLOCK_COUNT_X = 10
 const WORLD_BLOCK_COUNT_Y = 50
+const WORLD_SIZE_X = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_SIZE
+const WORLD_SIZE_Y = WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_SIZE
 const WORLD_BLOCK_COUNT = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_COUNT_Y
 const WORLD_SIZE = Vector2(WORLD_BLOCK_SIZE * WORLD_BLOCK_COUNT_X, WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_COUNT_Y)
 
@@ -295,7 +297,7 @@ class Block:
 	func draw_debug_tile(canvas : CanvasItem, pos : Vector2):
 
 		var pressure_opacity = clamp(pressure / (100000*1.0), 0.0, 1.0)
-		var temperature_red = clamp(temperature / 3000.0, 0.0, 1.0)
+		var temperature_red = clamp(temperature / 300.0, 0.0, 1.0)
 
 		var color = Color(temperature_red, 0.5, 1.0, pressure_opacity)
 
@@ -307,8 +309,8 @@ class Block:
 		#var pressure_text = "%10.1f" % ((pressure-100000))
 		var pressure_text = "%10.2f" % (pressure/100000)
 
-		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(0, 10), temp_text, Color(1.0,1.0,1.0,1.0))
-		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(0, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
+		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 10), temp_text, Color(1.0,1.0,1.0,1.0))
+		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
 
 
 class AtmosphericBlock extends Block:
@@ -330,13 +332,16 @@ class GroundBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 300, 0.13e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 600, 0.13e5)
 		# TODO proportionnal
 
 	func draw(canvas : CanvasItem, pos : Vector2):
 		draw_debug_tile(canvas, pos)
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0, 0.5, 0.5), true)
 		draw_velocity_debug(canvas, pos)
+
+
+
 
 class SurfaceBlock extends Block:
 
@@ -351,11 +356,17 @@ class SurfaceBlock extends Block:
 		draw_debug_tile(canvas, pos)
 		draw_velocity_debug(canvas, pos)
 
+		var left_pos = pos + Vector2(0, WORLD_BLOCK_SIZE * 0.5)
+		var right_pos = left_pos + Vector2(WORLD_BLOCK_SIZE, 0)
+		canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.0,0.0,0.0), 1)
+
+
 var font
 
 func _ready():
 	print("init world model")
-	rng.randomize()
+	#rng.randomize()
+
 	#for i in range(WORLD_BLOCK_COUNT):
 	#	blocks.append(Block.new())
 	blocks.resize(WORLD_BLOCK_COUNT)
@@ -369,13 +380,13 @@ func _ready():
 #	font.font_data = load("res://fonts/RobotoMono-Regular.ttf")
 #	font.size = 8
 
-	var altitude = 1500.0
+	var altitude = WORLD_SIZE_Y - 3500.0
 	var sloop_rate = 0
 
 	for x in range (WORLD_BLOCK_COUNT_X):
-		sloop_rate += rng.randfn(0.0, 1.0)
+		sloop_rate += rng.randfn(0.0, 0.2) * WORLD_BLOCK_SIZE
 
-		sloop_rate = clamp(sloop_rate, -10, 10)
+		sloop_rate = clamp(sloop_rate, -2 * WORLD_BLOCK_SIZE, 2 * WORLD_BLOCK_SIZE)
 		altitude += sloop_rate
 
 		if altitude < 200 or altitude > WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_SIZE - 200:
@@ -401,6 +412,8 @@ func _ready():
 		block.update_cache()
 
 
+	print_world_state()
+
 
 	print("init world done")
 
@@ -421,6 +434,36 @@ func _draw():
 
 var paused  = true
 
+func print_world_state():
+	var total_internal_energy = 0
+	var total_kinetic_energy = 0
+	var total_elastic_energy = 0
+	var total_thermal_energy = 0
+
+	var total_gas_N = []
+	for gas in range(PhysicalConstants.Gas.Count):
+		total_gas_N.append(0)
+
+	for block in blocks:
+		total_internal_energy += block.input_internal_energy + block.output_internal_energy
+		total_thermal_energy += block.input_thermal_energy + block.output_thermal_energy
+		total_elastic_energy += block.input_elastic_energy + block.output_elastic_energy
+		total_kinetic_energy += block.kinetic_energy
+		for gas in range(PhysicalConstants.Gas.Count):
+			total_gas_N[gas] += block.input_gas_composition_N[gas] + block.output_gas_composition_N[gas]
+
+	var total_energy = total_internal_energy + total_kinetic_energy
+
+	print("====")
+	print("total_internal_energy %s TJ" % (total_internal_energy / 1e9))
+	print("total_kinetic_energy %s MJ" % (total_kinetic_energy/ 1e6))
+	print("total_thermal_energy %s TJ" % (total_thermal_energy/ 1e9))
+	print("total_elastic_energy %s TJ" % (total_elastic_energy/ 1e9))
+	print("total_gas N:")
+	for gas in range(PhysicalConstants.Gas.Count):
+		print("- %s Mmol" % (total_gas_N[gas] / 1e6) )
+	print("total_energy %s TJ" % (total_energy/ 1e9))
+
 func _process(delta):
 
 	if Input.is_action_just_pressed("world_toogle_pause"):
@@ -431,34 +474,7 @@ func _process(delta):
 		update()
 
 	if Input.is_action_just_pressed("world_toogle_pause") or Input.is_action_just_pressed("world_step"):
-		var total_internal_energy = 0
-		var total_kinetic_energy = 0
-		var total_elastic_energy = 0
-		var total_thermal_energy = 0
-
-		var total_gas_N = []
-		for gas in range(PhysicalConstants.Gas.Count):
-			total_gas_N.append(0)
-
-		for block in blocks:
-			total_internal_energy += block.input_internal_energy + block.output_internal_energy
-			total_thermal_energy += block.input_thermal_energy + block.output_thermal_energy
-			total_elastic_energy += block.input_elastic_energy + block.output_elastic_energy
-			total_kinetic_energy += block.kinetic_energy
-			for gas in range(PhysicalConstants.Gas.Count):
-				total_gas_N[gas] += block.input_gas_composition_N[gas] + block.output_gas_composition_N[gas]
-
-		var total_energy = total_internal_energy + total_kinetic_energy
-
-		print("====")
-		print("total_internal_energy %s TJ" % (total_internal_energy / 1e9))
-		print("total_kinetic_energy %s MJ" % (total_kinetic_energy/ 1e6))
-		print("total_thermal_energy %s TJ" % (total_thermal_energy/ 1e9))
-		print("total_elastic_energy %s TJ" % (total_elastic_energy/ 1e9))
-		print("total_gas N:")
-		for gas in range(PhysicalConstants.Gas.Count):
-			print("- %s Mmol" % (total_gas_N[gas] / 1e6) )
-		print("total_energy %s TJ" % (total_energy/ 1e9))
+		print_world_state()
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func process_world(userdata):
@@ -534,7 +550,7 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 		var new_velocity = block.velocity_cache + acceleration * delta_time
 
 		# debug dumping
-		new_velocity *= 0.95
+		new_velocity *= 0.97
 
 
 		var top_block = get_block_at_with_wrapping(block_x, block_y -1)
@@ -580,30 +596,30 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 		if bottom_block:
 			transfert_block_volume(block, bottom_block, top_volume * 0.5, WORLD_BLOCK_SIZE)
 		if left_block:
-			transfert_block_volume(block, left_block, left_volume * 0.5, 0)
+			transfert_block_volume(block, left_block, -left_volume * 0.5, 0)
 		if right_block:
-			transfert_block_volume(block, right_block, -left_volume * 0.5, 0)
+			transfert_block_volume(block, right_block, left_volume * 0.5, 0)
 
 		if sign(block_movement.y) ==  sign(block_movement.x):
 			# Top left diagonal
 			var diagonal_volume = sign(block_movement.x) * block_movement.y * block_movement.x * WORLD_BLOCK_DEPTH
-
-			var top_left_block = get_block_at_with_wrapping(block_x-1, block_y -1)
-			var bottom_right_block = get_block_at_with_wrapping(block_x + 1, block_y + 1)
-			if top_left_block:
-				transfert_block_volume(block, top_left_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
-			if bottom_right_block:
-				transfert_block_volume(block, bottom_right_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
+			if diagonal_volume != 0:
+				var top_left_block = get_block_at_with_wrapping(block_x-1, block_y -1)
+				var bottom_right_block = get_block_at_with_wrapping(block_x + 1, block_y + 1)
+				if top_left_block:
+					transfert_block_volume(block, top_left_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
+				if bottom_right_block:
+					transfert_block_volume(block, bottom_right_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
 		else:
 			# Top right diagonal
 			var diagonal_volume = sign(block_movement.x) * block_movement.y * block_movement.x * WORLD_BLOCK_DEPTH
-
-			var top_right_block = get_block_at_with_wrapping(block_x+1, block_y -1)
-			var bottom_left_block = get_block_at_with_wrapping(block_x - 1, block_y + 1)
-			if top_right_block:
-				transfert_block_volume(block, top_right_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
-			if bottom_left_block:
-				transfert_block_volume(block, bottom_left_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
+			if diagonal_volume != 0:
+				var top_right_block = get_block_at_with_wrapping(block_x+1, block_y -1)
+				var bottom_left_block = get_block_at_with_wrapping(block_x - 1, block_y + 1)
+				if top_right_block:
+					transfert_block_volume(block, top_right_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
+				if bottom_left_block:
+					transfert_block_volume(block, bottom_left_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
 
 func get_block_at(block_x : int, block_y : int):
 	assert(block_x > -1)
@@ -640,9 +656,6 @@ func transfert_block_volume(block_a, block_b, signed_volume, delta_height):
 	else:
 		input_block = block_b
 		output_block = block_a
-
-	if volume >  input_block.gas_volume:
-		print("give overflow")
 
 	input_block.add_give_volume_order(output_block, volume, sign(signed_volume) * delta_height)
 
