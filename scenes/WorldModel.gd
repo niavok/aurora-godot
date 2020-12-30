@@ -4,19 +4,20 @@ const WORLD_BLOCK_SIZE = 1000
 #const WORLD_BLOCK_DEPTH = 1000.0
 const WORLD_BLOCK_DEPTH = 1.0
 const WORLD_BLOCK_INTERFACE_SECTION = WORLD_BLOCK_SIZE * WORLD_BLOCK_DEPTH
-const WORLD_BLOCK_COUNT_X = 10
-const WORLD_BLOCK_COUNT_Y = 50
+const WORLD_BLOCK_COUNT_X = 25
+const WORLD_BLOCK_COUNT_Y = 20
 const WORLD_SIZE_X = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_SIZE
 const WORLD_SIZE_Y = WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_SIZE
 const WORLD_BLOCK_COUNT = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_COUNT_Y
 const WORLD_SIZE = Vector2(WORLD_BLOCK_SIZE * WORLD_BLOCK_COUNT_X, WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_COUNT_Y)
 
 
-const RENDER_DEBUG_SCALE = 0.04
+const RENDER_DEBUG_SCALE = 0.05
 const RENDER_DEBUG_VELOCITY_SCALE = 15
-const RENDER_DEBUG_OFFSET = Vector2(-2200, -1700)
+const RENDER_DEBUG_OFFSET = Vector2(-2200, 750 - RENDER_DEBUG_SCALE * WORLD_BLOCK_SIZE * WORLD_BLOCK_COUNT_Y)
 
-
+const DEBUG_BLOCK_X = 17
+const DEBUG_BLOCK_Y = WORLD_BLOCK_COUNT_Y-1
 
 const blocks = []
 
@@ -25,10 +26,23 @@ var rng = RandomNumberGenerator.new()
 var world_processing_thread
 var world_processing_thread_running
 
+var world_enable_sun
+
 class Block:
 
 	# static
 	var gas_volume
+	var block_x
+	var block_y
+	var tl_render_block : Block
+	var tr_render_block : Block
+	var br_render_block : Block
+	var bl_render_block : Block
+	var l_render_block : Block
+	var r_render_block : Block
+	var t_render_block : Block
+	var b_render_block : Block
+
 
 	# dynamic
 	var input_internal_energy = 0
@@ -61,6 +75,7 @@ class Block:
 	var velocity_cache
 	var velocity_amplitude
 	var pressure_gradient
+	var new_velocity_list = []
 
 	func init_empty():
 		input_internal_energy = 0
@@ -77,6 +92,10 @@ class Block:
 			input_gas_composition_N[gas] = 0
 			output_gas_composition_N[gas] = 0
 			pending_input_gas_composition_N[gas] = 0
+
+	func velocity_dumping(new_velocity : Vector2) -> Vector2:
+		assert(false) # virtual pure
+		return new_velocity
 
 	func init_with_gas(gas : int, temperature : float, pressure : float):
 		init_empty()
@@ -157,7 +176,40 @@ class Block:
 
 
 	func apply_gas_movement():
+
+		if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
+			pass
+
+		var new_velocity_sum = Vector2()
+		var new_velocity_mass_sum = 0
+		for new_velocity in new_velocity_list:
+			new_velocity_sum += new_velocity[0] * new_velocity[1]
+			new_velocity_mass_sum += new_velocity[1]
+		new_velocity_list = []
+
+		# todo check if better to divide by mass or mass sum
+		var new_velocity = new_velocity_sum / new_velocity_mass_sum
+
+		var new_velocity_after_damping = velocity_dumping(new_velocity)
+
+		var new_kinetic_energy = 0.5 * mass * new_velocity_after_damping.length_squared()
+
+		var kinetic_energy_diff = new_kinetic_energy - kinetic_energy
+
+		var internal_energy = input_internal_energy + output_internal_energy
+
+		kinetic_energy = new_kinetic_energy
+		velocity_direction =new_velocity_after_damping.normalized()
+
+		var remaining_internal_energy = internal_energy - kinetic_energy_diff
+
+		var new_energy_ratio = remaining_internal_energy / internal_energy
+		input_internal_energy *= new_energy_ratio
+		output_internal_energy *= new_energy_ratio
+
+
 		var volume_to_give = 0
+
 		for give_order in give_volume_orders:
 			volume_to_give += give_order[1]
 
@@ -292,16 +344,116 @@ class Block:
 		var center_pos = pos + Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * 0.5
 		var velocity_pos = center_pos + velocity_cache * RENDER_DEBUG_VELOCITY_SCALE
 
-		canvas.draw_line(RENDER_DEBUG_OFFSET + center_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + velocity_pos * RENDER_DEBUG_SCALE, Color(1.0,0.0,0.0), 1)
+		var velocity_angle = velocity_cache.angle()
+
+		var red   = 0.5*(1+sin(velocity_angle));
+		var green = 0.5*(1+sin(velocity_angle + 2*PI / 3.0)); # + 60°
+		var blue  = 0.5*(1+sin(velocity_angle + 4*PI / 3.0)); # + 120°
+
+		var color = Color(red, green, blue)
+
+		canvas.draw_line(RENDER_DEBUG_OFFSET + center_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + velocity_pos * RENDER_DEBUG_SCALE, color, 2)
+
+	var min_temperature = 0
+	var max_temperature = 1500
+	var temperature_range = max_temperature - min_temperature
+
+	var temperature_buckets = [Color("#000000"),
+		Color("#00015c"),
+		Color("#9a009c"),
+		Color("#f06500"),
+		Color("#fec300"),
+		Color("#ffffff")]
+	var temperature_range_by_bucket = temperature_range / (temperature_buckets.size()-1)
+
+	func temperature_pressure_to_color(temperature, pressure) -> Color:
+
+		var color : Color
+
+		var temperature_bucket_start_index = int((temperature - min_temperature) / temperature_range_by_bucket)
+		if temperature_bucket_start_index >= temperature_buckets.size()-1:
+			color = temperature_buckets[temperature_buckets.size()-1]
+		else:
+			var temperature_bucket_end_index = temperature_bucket_start_index + 1
+			var temperature_in_bucket = temperature - min_temperature - temperature_bucket_start_index * temperature_range_by_bucket
+			var temperature_lerp_alpha = temperature_in_bucket / temperature_range_by_bucket
+			color = temperature_buckets[temperature_bucket_start_index].linear_interpolate(temperature_buckets[temperature_bucket_end_index], temperature_lerp_alpha)
+
+		var pressure_opacity = clamp(pressure / (50000*1.0), 0.0, 1.0)
+		#var temperature_red = clamp(temperature / 600.0, 0.0, 1.0)
+		#var temperature_rb = clamp((temperature - 600) / 1000.0, 0.0, 1.0)
+
+		color.a = pressure_opacity
+
+		 #var color = Color(temperature_red, temperature_rb, temperature_rb, pressure_opacity)
+		return color
+
+
+	func draw_bilinear_sub_tile(canvas : CanvasItem,pos : Vector2, temperatures, pressures):
+
+
+		var points = PoolVector2Array()
+		points.append(RENDER_DEBUG_OFFSET + (pos + Vector2(0,0))  * RENDER_DEBUG_SCALE)
+		points.append(RENDER_DEBUG_OFFSET + (pos + Vector2(WORLD_BLOCK_SIZE,0)* 0.5)  * RENDER_DEBUG_SCALE)
+		points.append(RENDER_DEBUG_OFFSET + (pos + Vector2(WORLD_BLOCK_SIZE,WORLD_BLOCK_SIZE)* 0.5)  * RENDER_DEBUG_SCALE)
+		points.append(RENDER_DEBUG_OFFSET + (pos + Vector2(0,WORLD_BLOCK_SIZE)* 0.5)  * RENDER_DEBUG_SCALE)
+
+		var colors = PoolColorArray()
+		for i in range(4):
+			colors.append(temperature_pressure_to_color(temperatures[i], pressures[i]))
+
+		canvas.draw_polygon(points, colors)
+
+
 
 	func draw_debug_tile(canvas : CanvasItem, pos : Vector2):
 
-		var pressure_opacity = clamp(pressure / (100000*1.0), 0.0, 1.0)
-		var temperature_red = clamp(temperature / 300.0, 0.0, 1.0)
+		var top_pressure = get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5)
+		var bottom_pressure = get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5)
 
-		var color = Color(temperature_red, 0.5, 1.0, pressure_opacity)
+		var tl_temperature = (temperature + tl_render_block.temperature + t_render_block.temperature + l_render_block.temperature) / 4
+		var tr_temperature = (temperature + tr_render_block.temperature + t_render_block.temperature + r_render_block.temperature) / 4
+		var br_temperature = (temperature + br_render_block.temperature + b_render_block.temperature + r_render_block.temperature) / 4
+		var bl_temperature = (temperature + bl_render_block.temperature + b_render_block.temperature + l_render_block.temperature) / 4
 
-		canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), color, true)
+		var l_temperature = (temperature + l_render_block.temperature) / 2
+		var r_temperature = (temperature + r_render_block.temperature) / 2
+		var t_temperature = (temperature + t_render_block.temperature) / 2
+		var b_temperature = (temperature + b_render_block.temperature) / 2
+
+		var tl_pressure = (pressure + tl_render_block.get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5) + t_render_block.get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5) + l_render_block.get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5)) / 4
+		var tr_pressure = (pressure + tr_render_block.get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5) + t_render_block.get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5) + r_render_block.get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5)) / 4
+		var br_pressure = (pressure + br_render_block.get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5) + b_render_block.get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5) + r_render_block.get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5)) / 4
+		var bl_pressure = (pressure + bl_render_block.get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5) + b_render_block.get_pressure_at_relative_altitude(-WORLD_BLOCK_SIZE*0.5) + l_render_block.get_pressure_at_relative_altitude(WORLD_BLOCK_SIZE*0.5)) / 4
+
+		var l_pressure = (pressure + l_render_block.pressure) / 2
+		var r_pressure = (pressure + r_render_block.pressure) / 2
+		var t_pressure = (pressure + t_render_block.pressure) / 2
+		var b_pressure = (pressure + b_render_block.pressure) / 2
+
+
+		draw_bilinear_sub_tile(canvas, pos, [tl_temperature, t_temperature, temperature, l_temperature], [tl_pressure, t_pressure, pressure, l_pressure])
+		draw_bilinear_sub_tile(canvas, pos + Vector2(WORLD_BLOCK_SIZE*0.5, 0), [t_temperature, tr_temperature, r_temperature, temperature], [t_pressure, tr_pressure, r_pressure, pressure])
+		draw_bilinear_sub_tile(canvas, pos + Vector2(WORLD_BLOCK_SIZE*0.5, WORLD_BLOCK_SIZE*0.5), [temperature, r_temperature, br_temperature, b_temperature], [pressure, r_pressure, br_pressure, b_pressure])
+		draw_bilinear_sub_tile(canvas, pos + Vector2(0, WORLD_BLOCK_SIZE*0.5), [l_temperature, temperature, b_temperature, bl_temperature], [l_pressure, pressure, b_pressure, br_pressure])
+
+
+#		var top_pressure_opacity = clamp(top_pressure / (100000*1.0), 0.0, 1.0)
+#		var bottom_pressure_opacity = clamp(bottom_pressure / (100000*1.0), 0.0, 1.0)
+#		var tl_temperature_red = clamp(tl_temperature / 300.0, 0.0, 1.0)
+#		var tr_temperature_red = clamp(tr_temperature / 300.0, 0.0, 1.0)
+#		var br_temperature_red = clamp(br_temperature / 300.0, 0.0, 1.0)
+#		var bl_temperature_red = clamp(bl_temperature / 300.0, 0.0, 1.0)
+#
+#		var tl_color = Color(tl_temperature_red, 0.5, 1.0, top_pressure_opacity)
+#		var tr_color = Color(tr_temperature_red, 0.5, 1.0, top_pressure_opacity)
+#		var br_color = Color(br_temperature_red, 0.5, 1.0, bottom_pressure_opacity)
+#		var bl_color = Color(bl_temperature_red, 0.5, 1.0, bottom_pressure_opacity)
+
+
+
+
+		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), color, true)
 
 		#var temp_text = String.format("%10.3f" % temperature)
 
@@ -309,8 +461,11 @@ class Block:
 		#var pressure_text = "%10.1f" % ((pressure-100000))
 		var pressure_text = "%10.2f" % (pressure/100000)
 
-		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 10), temp_text, Color(1.0,1.0,1.0,1.0))
-		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
+		#canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 10), temp_text, Color(1.0,1.0,1.0,1.0))
+		#canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
+
+		#if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
+		#	canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,1.0,1.0), false)
 
 	func get_pressure_at_relative_altitude(relative_altitude : float):
 		return pressure + pressure_gradient * relative_altitude
@@ -321,20 +476,22 @@ class AtmosphericBlock extends Block:
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
 		#init_with_gas(PhysicalConstants.Gas.Nitrogen, 274, 1e5)
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 300, 0.13e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 
 	func draw(canvas : CanvasItem, pos : Vector2):
 		draw_debug_tile(canvas, pos)
 
 		draw_velocity_debug(canvas, pos)
 
+	func velocity_dumping(new_velocity : Vector2) -> Vector2:
+		return new_velocity
 
 
 class GroundBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 600, 0.13e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 		# TODO proportionnal
 
 	func draw(canvas : CanvasItem, pos : Vector2):
@@ -342,6 +499,13 @@ class GroundBlock extends Block:
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0, 0.5, 0.5), true)
 		draw_velocity_debug(canvas, pos)
 
+	func velocity_dumping(new_velocity : Vector2) -> Vector2:
+		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
+			return Vector2(new_velocity.x, 0)
+		else:
+			return new_velocity
+
+		return new_velocity * 0.9
 
 
 
@@ -350,7 +514,7 @@ class SurfaceBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
 		init_empty()
-		init_with_gas(PhysicalConstants.Gas.Nitrogen, 300, 0.13e5)
+		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 		# TODO depend on ground composition
 
 	func draw(canvas : CanvasItem, pos : Vector2):
@@ -360,7 +524,19 @@ class SurfaceBlock extends Block:
 
 		var left_pos = pos + Vector2(0, WORLD_BLOCK_SIZE * 0.5)
 		var right_pos = left_pos + Vector2(WORLD_BLOCK_SIZE, 0)
-		canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.0,0.0,0.0), 1)
+		#canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.0,0.0,0.0), 1)
+
+	func velocity_dumping(new_velocity : Vector2) -> Vector2:
+		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
+			return Vector2(new_velocity.x, 0)
+		else:
+			return new_velocity
+
+		if new_velocity.y > 0:
+			return Vector2(new_velocity.x * 0.99, new_velocity.y * 0.99)
+		else:
+			return Vector2(new_velocity.x * 0.99, new_velocity.y)
+
 
 
 var font
@@ -412,6 +588,30 @@ func _ready():
 		var block = blocks[i]
 		block.init()
 		block.update_cache()
+
+	for x in range (WORLD_BLOCK_COUNT_X):
+		for y in range(WORLD_BLOCK_COUNT_Y):
+			var block = blocks[x + y  * WORLD_BLOCK_COUNT_X]
+			block.block_x = x
+			block.block_y = y
+
+			var neighbour_block
+			neighbour_block = get_block_at_with_wrapping(x-1, y-1)
+			block.tl_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x+1, y-1)
+			block.tr_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x+1, y+1)
+			block.br_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x-1, y+1)
+			block.bl_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x-1, y)
+			block.l_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x+1, y)
+			block.r_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x, y-1)
+			block.t_render_block = neighbour_block if neighbour_block != null else block
+			neighbour_block = get_block_at_with_wrapping(x, y+1)
+			block.b_render_block = neighbour_block if neighbour_block != null else block
 
 
 	print_world_state()
@@ -468,11 +668,16 @@ func print_world_state():
 
 func _process(delta):
 
+	if Input.is_action_just_pressed("world_debug_toogle_sun"):
+		world_enable_sun = !world_enable_sun
+		print("world_enable_sun=", world_enable_sun)
+
+
 	if Input.is_action_just_pressed("world_toogle_pause"):
 		paused = !paused
 
 	if not paused or Input.is_action_just_pressed("world_step"):
-		step_world(0.1)
+		step_world(0.5)
 		update()
 
 	if Input.is_action_just_pressed("world_toogle_pause") or Input.is_action_just_pressed("world_step"):
@@ -502,7 +707,7 @@ func step_world(delta_time):
 			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x+1, y), 1, 0)
 			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y+1), 0, 1)
 	for x in range (WORLD_BLOCK_COUNT_X):
-		compute_gas_transition(delta_time, get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 2), get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), 1, 0)
+		compute_gas_transition(delta_time, get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), get_block_at_with_wrapping(x+1, WORLD_BLOCK_COUNT_Y - 1), 1, 0)
 
 
 	for i in range (WORLD_BLOCK_COUNT):
@@ -510,11 +715,33 @@ func step_world(delta_time):
 
 # TODO diffusion, decantation
 
+	# apply debug heat
+	if world_enable_sun:
+		for x in range (WORLD_BLOCK_COUNT_X):
+			var heat_alpha = sin( PI * float(x) / WORLD_BLOCK_COUNT_X)
+			heat_alpha = 1 + heat_alpha * 0.001
+			var surface = WORLD_BLOCK_INTERFACE_SECTION
+			var power = heat_alpha * surface * 1000000
+			var energy = delta_time * power
+			var block = get_block_at(x, WORLD_BLOCK_COUNT_Y - 1)
+
+			var internal_energy = block.input_internal_energy + block.output_internal_energy
+			var new_internal_energy = internal_energy + energy
+			var new_energy_ratio = new_internal_energy / internal_energy
+			block.input_internal_energy *= new_energy_ratio
+			block.output_internal_energy *= new_energy_ratio
+
+
 
 	for i in range (WORLD_BLOCK_COUNT):
 		var block = blocks[i]
 		block.integrate_pending()
 		block.update_cache()
+
+
+	#var debug_block = get_block_at(DEBUG_BLOCK_X, DEBUG_BLOCK_Y)
+	#print("debug_block vel = ", str(debug_block.velocity_cache))
+
 
 
 	# export molecules based one tempature -> velocity repartition -> movement on side
@@ -631,7 +858,14 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 					transfert_block_volume(block, bottom_left_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
 
 func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block, dx : int, dy : int):
+
+	if block_a.block_x == DEBUG_BLOCK_X and block_a.block_y == DEBUG_BLOCK_Y:
+		pass
+	if block_b.block_x == DEBUG_BLOCK_X and block_b.block_y == DEBUG_BLOCK_Y:
+		pass
+
 	var delta_pressure = block_a.get_pressure_at_relative_altitude(dy * WORLD_BLOCK_SIZE * 0.5) - block_b.get_pressure_at_relative_altitude(-dy * WORLD_BLOCK_SIZE * 0.5)
+
 
 	var transition_direction = Vector2(dx, dy)
 
@@ -648,6 +882,7 @@ func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block
 
 	var new_transition_velocity = transition_velocity + acceleration * delta_time
 
+
 	var linear_transition_velocity = new_transition_velocity.dot(transition_direction)
 
 	var linear_translation = linear_transition_velocity * delta_time
@@ -655,6 +890,9 @@ func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block
 	var volume_displaced = linear_translation_clamped * WORLD_BLOCK_INTERFACE_SECTION
 
 	transfert_block_volume(block_a, block_b, volume_displaced, dy * WORLD_BLOCK_SIZE)
+
+	block_a.new_velocity_list.append([new_transition_velocity, block_a.mass * 0.5])
+	block_b.new_velocity_list.append([new_transition_velocity, block_a.mass * 0.5])
 
 
 func get_block_at(block_x : int, block_y : int):

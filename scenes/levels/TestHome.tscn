@@ -20,9 +20,11 @@ layer = -1
 follow_viewport_enable = true
 
 [node name="Sprite" type="Sprite" parent="MainLevel"]
+visible = false
 texture = ExtResource( 2 )
 
 [node name="ColorRect2" type="ColorRect" parent="MainLevel"]
+visible = false
 margin_left = -2795.68
 margin_top = 521.024
 margin_right = 3224.32
@@ -33,6 +35,7 @@ __meta__ = {
 }
 
 [node name="ColorRect3" type="ColorRect" parent="MainLevel"]
+visible = false
 margin_left = -8504.0
 margin_top = -2864.0
 margin_right = -2484.0
@@ -43,6 +46,7 @@ __meta__ = {
 }
 
 [node name="ColorRect4" type="ColorRect" parent="MainLevel"]
+visible = false
 margin_left = 2389.98
 margin_top = -2939.5
 margin_right = 8409.98
@@ -104,10 +108,11 @@ position = Vector2( -3.77979, 0 )
 motion_scale = Vector2( 0.3, 0.3 )
 
 [node name="ColorRect" type="ColorRect" parent="Background/ParallaxBackground/ParallaxLayer"]
-margin_left = -2777.65
-margin_top = -2579.3
-margin_right = 3242.35
-margin_bottom = 513.697
+modulate = Color( 0.0705882, 0.0627451, 0.0627451, 1 )
+margin_left = -3162.32
+margin_top = -2132.41
+margin_right = 2857.68
+margin_bottom = 960.59
 color = Color( 0.509804, 0.647059, 0.592157, 1 )
 __meta__ = {
 "_edit_use_anchors_": false
