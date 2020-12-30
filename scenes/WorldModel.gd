@@ -312,6 +312,8 @@ class Block:
 		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 10), temp_text, Color(1.0,1.0,1.0,1.0))
 		canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
 
+	func get_pressure_at_relative_altitude(relative_altitude : float):
+		return pressure + pressure_gradient * relative_altitude
 
 class AtmosphericBlock extends Block:
 
@@ -491,9 +493,16 @@ func step_world(delta_time):
 
 	# compute pressure again ?
 
+	#for x in range (WORLD_BLOCK_COUNT_X):
+	#	for y in range (WORLD_BLOCK_COUNT_Y):
+	#		compute_gas_block_movement(delta_time, x, y, get_block_at(x, y))
+
 	for x in range (WORLD_BLOCK_COUNT_X):
-		for y in range (WORLD_BLOCK_COUNT_Y):
-			compute_gas_block_movement(delta_time, x, y, get_block_at(x, y))
+		for y in range (WORLD_BLOCK_COUNT_Y - 1):
+			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y), 1, 0)
+			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y), 0, 1)
+	for x in range (WORLD_BLOCK_COUNT_X):
+		compute_gas_transition(delta_time, get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), 1, 0)
 
 
 	for i in range (WORLD_BLOCK_COUNT):
@@ -620,6 +629,33 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 					transfert_block_volume(block, top_right_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
 				if bottom_left_block:
 					transfert_block_volume(block, bottom_left_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
+
+func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block, dx : int, dy : int):
+	var delta_pressure = block_b.get_pressure_at_relative_altitude(-dy * WORLD_BLOCK_SIZE * 0.5) - block_a.get_pressure_at_relative_altitude(dy * WORLD_BLOCK_SIZE * 0.5)
+
+	var transition_direction = Vector2(dx, dy)
+
+	var transition_mass = 0.5 * (block_a.mass + block_b.mass)
+
+	var transition_velocity = 0.5 * (block_a.velocity_cache * block_a.mass + block_b.velocity_cache * block_b.mass) / transition_mass
+
+	var force = transition_direction * delta_pressure * WORLD_BLOCK_INTERFACE_SECTION # Pa * m2 = N
+
+	var acceleration = force / transition_mass
+
+	if dy != 0:
+		acceleration += Vector2(0, 9.81)
+
+	var new_transition_velocity = transition_velocity + acceleration * delta_time
+
+	var linear_transition_velocity = new_transition_velocity.dot(transition_direction)
+
+	var linear_translation = linear_transition_velocity * delta_time
+	var linear_translation_clamped = clamp(linear_translation,-WORLD_BLOCK_SIZE * 0.5, WORLD_BLOCK_SIZE * 0.5)
+	var volume_displaced = linear_translation_clamped * WORLD_BLOCK_INTERFACE_SECTION
+
+	transfert_block_volume(block_a, block_b, volume_displaced, dy * WORLD_BLOCK_SIZE)
+
 
 func get_block_at(block_x : int, block_y : int):
 	assert(block_x > -1)
