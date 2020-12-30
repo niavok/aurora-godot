@@ -499,10 +499,10 @@ func step_world(delta_time):
 
 	for x in range (WORLD_BLOCK_COUNT_X):
 		for y in range (WORLD_BLOCK_COUNT_Y - 1):
-			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y), 1, 0)
-			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y), 0, 1)
+			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x+1, y), 1, 0)
+			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y+1), 0, 1)
 	for x in range (WORLD_BLOCK_COUNT_X):
-		compute_gas_transition(delta_time, get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), 1, 0)
+		compute_gas_transition(delta_time, get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 2), get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), 1, 0)
 
 
 	for i in range (WORLD_BLOCK_COUNT):
@@ -631,7 +631,7 @@ func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int
 					transfert_block_volume(block, bottom_left_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
 
 func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block, dx : int, dy : int):
-	var delta_pressure = block_b.get_pressure_at_relative_altitude(-dy * WORLD_BLOCK_SIZE * 0.5) - block_a.get_pressure_at_relative_altitude(dy * WORLD_BLOCK_SIZE * 0.5)
+	var delta_pressure = block_a.get_pressure_at_relative_altitude(dy * WORLD_BLOCK_SIZE * 0.5) - block_b.get_pressure_at_relative_altitude(-dy * WORLD_BLOCK_SIZE * 0.5)
 
 	var transition_direction = Vector2(dx, dy)
 
@@ -643,8 +643,8 @@ func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block
 
 	var acceleration = force / transition_mass
 
-	if dy != 0:
-		acceleration += Vector2(0, 9.81)
+	#if dy != 0:
+	#	acceleration += Vector2(0, 9.81)
 
 	var new_transition_velocity = transition_velocity + acceleration * delta_time
 
