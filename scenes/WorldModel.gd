@@ -298,8 +298,9 @@ class Block:
 			var given_kinetic_energy = kinetic_energy * given_mass_ratio
 			give_volume_orders[give_order_index][0].give_kinetic_energy(given_kinetic_energy, velocity_direction)
 
-		var remaining_kinetic_energy_ratio = 1 - total_given_mass / mass
-		kinetic_energy *= remaining_kinetic_energy_ratio
+		if mass > 0:
+			var remaining_kinetic_energy_ratio = 1 - total_given_mass / mass
+			kinetic_energy *= remaining_kinetic_energy_ratio
 
 		# compute potiential energydifference
 		for give_order_index in range(give_volume_orders.size()):
