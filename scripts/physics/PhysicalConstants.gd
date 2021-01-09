@@ -5,6 +5,7 @@ var gas_adiabatic_index = 1.3;
 var gas_elastic_coef = gas_adiabatic_index / (gas_adiabatic_index - 1);
 var gravity = 9.81 # m.s-2
 
+
 enum Gas {
 	#Hydrogen, #H2
 	Nitrogen, #N2
@@ -20,6 +21,23 @@ enum Gas {
 
 	Count
 }
+
+enum LightDirection {
+	Right,
+	Down,
+	Left,
+	Up,
+	Count
+}
+
+enum LightType {
+	Infrared,
+	Visible,
+	Ultraviolet,
+	Count
+}
+
+# TODO Neutrons
 
 var gas_specific_heat = [] # J.K-1.kg-1
 var gas_mass_by_mole = [] # kg.mol-1

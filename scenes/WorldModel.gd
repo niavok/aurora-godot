@@ -4,13 +4,17 @@ const WORLD_BLOCK_SIZE = 1000
 #const WORLD_BLOCK_DEPTH = 1000.0
 const WORLD_BLOCK_DEPTH = 1.0
 const WORLD_BLOCK_INTERFACE_SECTION = WORLD_BLOCK_SIZE * WORLD_BLOCK_DEPTH
-const WORLD_BLOCK_COUNT_X = 25
-const WORLD_BLOCK_COUNT_Y = 20
+const WORLD_BLOCK_COUNT_X = 50
+const WORLD_BLOCK_COUNT_Y = 15
 const WORLD_SIZE_X = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_SIZE
 const WORLD_SIZE_Y = WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_SIZE
 const WORLD_BLOCK_COUNT = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_COUNT_Y
 const WORLD_SIZE = Vector2(WORLD_BLOCK_SIZE * WORLD_BLOCK_COUNT_X, WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_COUNT_Y)
 
+
+const WORLD_RADIUS = 100000.0
+const WORLD_BLOCK_SPHERICAL_OVERFLOW = WORLD_RADIUS - sqrt(WORLD_RADIUS*WORLD_RADIUS - WORLD_BLOCK_SIZE*WORLD_BLOCK_SIZE)
+const WORLD_BLOCK_SPHERICAL_COEF = WORLD_BLOCK_SPHERICAL_OVERFLOW / WORLD_BLOCK_SIZE
 
 const RENDER_DEBUG_SCALE = 0.05
 const RENDER_DEBUG_VELOCITY_SCALE = 15
@@ -18,6 +22,8 @@ const RENDER_DEBUG_OFFSET = Vector2(-2200, 750 - RENDER_DEBUG_SCALE * WORLD_BLOC
 
 const DEBUG_BLOCK_X = 17
 const DEBUG_BLOCK_Y = WORLD_BLOCK_COUNT_Y-1
+
+
 
 const blocks = []
 
@@ -29,6 +35,9 @@ var world_processing_thread_running
 var world_enable_sun
 
 class Block:
+
+	# debug, clean
+	var is_init = false
 
 	# static
 	var gas_volume
@@ -55,6 +64,10 @@ class Block:
 	var pending_input_gas_composition_N = []
 	var pending_kinetic_energy = []
 
+	# Light energy, four direction, 3 energy range : IR, Visible, UV
+	var light_energy_by_direction = []
+	var light_energy_by_direction_pending = []
+
 	# Cache
 	var pressure
 	var temperature
@@ -76,8 +89,13 @@ class Block:
 	var velocity_amplitude
 	var pressure_gradient
 	var new_velocity_list = []
+	var albedo = []
+	var opacity = []
+	var diffusion = []
 
 	func init_empty():
+		assert(!is_init)
+		is_init = true
 		input_internal_energy = 0
 		output_internal_energy = 0
 		kinetic_energy = 0
@@ -93,6 +111,17 @@ class Block:
 			output_gas_composition_N[gas] = 0
 			pending_input_gas_composition_N[gas] = 0
 
+		light_energy_by_direction = []
+		light_energy_by_direction_pending = []
+		for light_direction in range(PhysicalConstants.LightDirection.Count):
+			light_energy_by_direction.append([])
+			light_energy_by_direction_pending.append([])
+			var light_energy_direction = light_energy_by_direction[light_direction]
+			var light_energy_direction_pending = light_energy_by_direction_pending[light_direction]
+			for light_type in range(PhysicalConstants.LightType.Count):
+				light_energy_direction.append(0.0)
+				light_energy_direction_pending.append(0.0)
+
 	func velocity_dumping(new_velocity : Vector2) -> Vector2:
 		assert(false) # virtual pure
 		return new_velocity
@@ -104,6 +133,8 @@ class Block:
 		output_gas_composition_N[gas] = totalN
 		output_internal_energy = PhysicalConstants.estimate_internal_energy(gas, totalN, temperature, gas_volume);
 
+	func add_light(light_direction, light_type, light_energy : float):
+		light_energy_by_direction[light_direction][light_type] += light_energy
 
 	func update_cache():
 
@@ -313,6 +344,74 @@ class Block:
 				output_internal_energy += potential_energy_diff * (1-volume_ratio)
 		give_volume_orders = []
 
+	func apply_light_movement():
+
+		# TODO update albedo
+
+		var modified_light_by_direction = []
+
+		var light_variation_by_direction = []
+
+		# apply pending light
+		for light_direction in range(PhysicalConstants.LightDirection.Count):
+			light_energy_by_direction[light_direction] = light_energy_by_direction_pending[light_direction]
+			light_energy_by_direction_pending[light_direction] = [0.0,0.0,0.0]
+
+		# apply light spherical distortion ratio
+		for light_type in range(PhysicalConstants.LightType.Count):
+			var transfered_energy = 0.0
+			transfered_energy += light_energy_by_direction[PhysicalConstants.LightDirection.Left][light_type] * WORLD_BLOCK_SPHERICAL_COEF
+			transfered_energy += light_energy_by_direction[PhysicalConstants.LightDirection.Right][light_type] * WORLD_BLOCK_SPHERICAL_COEF
+
+			light_energy_by_direction[PhysicalConstants.LightDirection.Up][light_type] += transfered_energy
+			light_energy_by_direction[PhysicalConstants.LightDirection.Left][light_type] *= 1 - WORLD_BLOCK_SPHERICAL_COEF
+			light_energy_by_direction[PhysicalConstants.LightDirection.Right][light_type] *= 1 - WORLD_BLOCK_SPHERICAL_COEF
+
+		for light_direction in range(PhysicalConstants.LightDirection.Count):
+
+			var light_energy_direction = light_energy_by_direction[light_direction]
+
+			# test absorbsion
+			modified_light_by_direction.append([])
+			light_variation_by_direction.append([])
+
+			var modified_light_by_type = modified_light_by_direction[light_direction]
+
+			for light_type in range(PhysicalConstants.LightType.Count):
+				var light_energy = light_energy_direction[light_type]
+
+				var modified_light_energy = light_energy * opacity[light_type]
+				light_variation_by_direction[light_direction].append(-modified_light_energy)
+				modified_light_by_direction[light_direction].append(modified_light_energy)
+
+		for light_direction in range(PhysicalConstants.LightDirection.Count):
+			var modified_light_by_type = modified_light_by_direction[light_direction]
+			for light_type in range(PhysicalConstants.LightType.Count):
+				var modified_light_energy = modified_light_by_type[light_type]
+
+				var returned_energy = modified_light_energy * albedo[light_type]
+				var diffused_energy = returned_energy * diffusion[light_type]
+				var reflected_energy = returned_energy - diffused_energy
+
+				light_variation_by_direction[(light_direction + 2) % 4][light_type] += reflected_energy
+				light_variation_by_direction[(light_direction + 1) % 4][light_type] += diffused_energy * 0.5
+				light_variation_by_direction[(light_direction + 3) % 4][light_type] += diffused_energy * 0.5
+
+				var absorbed_energy = modified_light_energy - returned_energy
+				add_internal_energy(absorbed_energy)
+
+
+
+		# todo emissivity/ black body radiation
+
+		# Apply light variation
+		for light_direction in range(PhysicalConstants.LightDirection.Count):
+			var light_variation_for_direction = light_variation_by_direction[light_direction]
+			var light_energy_direction = light_energy_by_direction[light_direction]
+
+			for light_type in range(PhysicalConstants.LightType.Count):
+				light_energy_direction[light_type] += light_variation_for_direction[light_type]
+
 	func integrate_pending():
 		input_internal_energy += pending_input_internal_energy
 
@@ -338,6 +437,15 @@ class Block:
 			input_internal_energy += kinetic_energy_diff
 			pending_kinetic_energy = []
 
+	func add_internal_energy(energy : float):
+		var internal_energy = input_internal_energy + output_internal_energy
+
+		var new_internal_energy = internal_energy + energy
+
+		var new_energy_ratio = new_internal_energy / internal_energy
+		input_internal_energy *= new_energy_ratio
+		output_internal_energy *= new_energy_ratio
+
 	func give_kinetic_energy(energy, direction):
 		pending_kinetic_energy.append([energy, direction])
 
@@ -354,6 +462,41 @@ class Block:
 		var color = Color(red, green, blue)
 
 		canvas.draw_line(RENDER_DEBUG_OFFSET + center_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + velocity_pos * RENDER_DEBUG_SCALE, color, 2)
+
+
+	var debug_light_directions = [ Vector2(1, 0), Vector2(0, 1), Vector2(-1, 0), Vector2(0, -1) ]
+	var debug_light_type_color = [ Color(1.0, 0.0, 0.0, 0.3), Color(0.0, 1.0, 0.0, 0.3), Color(0.0, 0.0, 1.0, 0.3) ]
+
+	func draw_light_direction_debug(canvas : CanvasItem, pos : Vector2, direction : Vector2, light_energy : Array):
+
+		var ortho_dir = direction.rotated(PI/2)
+
+		#var base_start = pos + ortho_dir * 300 + direction * 100
+		#var end_start = base_start + ortho_dir * 200
+		#canvas.draw_line(RENDER_DEBUG_OFFSET + base_start * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + end_start * RENDER_DEBUG_SCALE, Color(1.0,1.0,1.0), 1)
+
+
+		for light_type in range(PhysicalConstants.LightType.Count):
+			var energy = light_energy[light_type]
+			var start_pos = pos + ortho_dir * (300 + light_type * 100) + direction * 100
+			var end_pos = start_pos + direction * 0.005 * energy / WORLD_BLOCK_INTERFACE_SECTION
+			var color = debug_light_type_color[light_type]
+
+			canvas.draw_line(RENDER_DEBUG_OFFSET + start_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + end_pos * RENDER_DEBUG_SCALE, color, 1)
+
+	func draw_light_debug(canvas : CanvasItem, pos : Vector2):
+
+		var pos_positions = []
+		var center_pos = pos + Vector2(WORLD_BLOCK_SIZE * 0.5, WORLD_BLOCK_SIZE * 0.5)
+#		pos_positions.append(center_pos + Vector2(WORLD_BLOCK_SIZE * 0.2, 0))
+#		pos_positions.append(center_pos + Vector2(0, WORLD_BLOCK_SIZE * 0.2))
+#		pos_positions.append(center_pos + Vector2(0, -WORLD_BLOCK_SIZE * 0.2))
+#		pos_positions.append(center_pos + Vector2(-WORLD_BLOCK_SIZE * 0.2, 0))
+
+		for light_direction in range(PhysicalConstants.LightDirection.Count):
+			draw_light_direction_debug(canvas, center_pos, debug_light_directions[light_direction], light_energy_by_direction[light_direction])
+
+
 
 	var min_temperature = 0
 	var max_temperature = 1500
@@ -462,6 +605,9 @@ class Block:
 		#var pressure_text = "%10.1f" % ((pressure-100000))
 		var pressure_text = "%10.2f" % (pressure/100000)
 
+
+
+
 		#canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 10), temp_text, Color(1.0,1.0,1.0,1.0))
 		#canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
 
@@ -475,7 +621,11 @@ class AtmosphericBlock extends Block:
 
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
-		init_empty()
+
+		opacity = [0.01, 0.005, 0.01]
+		albedo = [0.5, 0.2, 0.01]
+		diffusion = [0.7, 0.7, 0.7]
+
 		#init_with_gas(PhysicalConstants.Gas.Nitrogen, 274, 1e5)
 		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 
@@ -484,6 +634,8 @@ class AtmosphericBlock extends Block:
 
 		draw_velocity_debug(canvas, pos)
 
+		draw_light_debug(canvas, pos)
+
 	func velocity_dumping(new_velocity : Vector2) -> Vector2:
 		return new_velocity
 
@@ -491,7 +643,11 @@ class AtmosphericBlock extends Block:
 class GroundBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
-		init_empty()
+
+		opacity = [1.0, 1.0, 1.0]
+		albedo = [0.0, 0.0, 0.0]
+		diffusion = [0.0, 0.0, 0.0]
+
 		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 		# TODO proportionnal
 
@@ -499,6 +655,8 @@ class GroundBlock extends Block:
 		draw_debug_tile(canvas, pos)
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0, 0.5, 0.5), true)
 		draw_velocity_debug(canvas, pos)
+
+		draw_light_debug(canvas, pos)
 
 	func velocity_dumping(new_velocity : Vector2) -> Vector2:
 		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
@@ -514,7 +672,11 @@ class SurfaceBlock extends Block:
 
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
-		init_empty()
+
+		opacity = [1.0, 1.0, 1.0]
+		albedo = [0.1, 0.5, 0.01]
+		diffusion = [0.5, 0.5, 0.5]
+
 		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 		# TODO depend on ground composition
 
@@ -522,10 +684,10 @@ class SurfaceBlock extends Block:
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(0.5, 1.0, 0.5), true)
 		draw_debug_tile(canvas, pos)
 		draw_velocity_debug(canvas, pos)
-
+		draw_light_debug(canvas, pos)
 		var left_pos = pos + Vector2(0, WORLD_BLOCK_SIZE * 0.5)
 		var right_pos = left_pos + Vector2(WORLD_BLOCK_SIZE, 0)
-		#canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.0,0.0,0.0), 1)
+		canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.0,0.0,0.0), 1)
 
 	func velocity_dumping(new_velocity : Vector2) -> Vector2:
 		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
@@ -563,7 +725,7 @@ func _ready():
 	var sloop_rate = 0
 
 	for x in range (WORLD_BLOCK_COUNT_X):
-		sloop_rate += rng.randfn(0.0, 0.2) * WORLD_BLOCK_SIZE
+		sloop_rate += rng.randfn(0.0, 0.1) * WORLD_BLOCK_SIZE * 0.5
 
 		sloop_rate = clamp(sloop_rate, -2 * WORLD_BLOCK_SIZE, 2 * WORLD_BLOCK_SIZE)
 		altitude += sloop_rate
@@ -705,14 +867,28 @@ func step_world(delta_time):
 
 	for x in range (WORLD_BLOCK_COUNT_X):
 		for y in range (WORLD_BLOCK_COUNT_Y - 1):
-			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x+1, y), 1, 0)
-			compute_gas_transition(delta_time, get_block_at_with_wrapping(x, y), get_block_at_with_wrapping(x, y+1), 0, 1)
+			var current_block = get_block_at_with_wrapping(x, y)
+			var right_block = get_block_at_with_wrapping(x+1, y)
+			var down_block = get_block_at_with_wrapping(x, y+1)
+
+			compute_gas_transition(delta_time, current_block, right_block, 1, 0)
+			compute_gas_transition(delta_time, current_block, down_block, 0, 1)
+
+			compute_light_transition(delta_time, current_block, right_block, 1, 0)
+			compute_light_transition(delta_time, current_block, down_block, 0, 1)
+
 	for x in range (WORLD_BLOCK_COUNT_X):
-		compute_gas_transition(delta_time, get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1), get_block_at_with_wrapping(x+1, WORLD_BLOCK_COUNT_Y - 1), 1, 0)
+		var current_block = get_block_at_with_wrapping(x, WORLD_BLOCK_COUNT_Y - 1)
+		var right_block = get_block_at_with_wrapping(x+1, WORLD_BLOCK_COUNT_Y - 1)
+		compute_gas_transition(delta_time, current_block, right_block, 1, 0)
+		compute_light_transition(delta_time, current_block, right_block, 1, 0)
 
 
 	for i in range (WORLD_BLOCK_COUNT):
 		blocks[i].apply_gas_movement()
+		blocks[i].apply_light_movement()
+
+
 
 # TODO diffusion, decantation
 
@@ -724,14 +900,11 @@ func step_world(delta_time):
 			var surface = WORLD_BLOCK_INTERFACE_SECTION
 			var power = heat_alpha * surface * 1000000
 			var energy = delta_time * power
-			var block = get_block_at(x, WORLD_BLOCK_COUNT_Y - 1)
+			var block = get_block_at(x, 0)
 
-			var internal_energy = block.input_internal_energy + block.output_internal_energy
-			var new_internal_energy = internal_energy + energy
-			var new_energy_ratio = new_internal_energy / internal_energy
-			block.input_internal_energy *= new_energy_ratio
-			block.output_internal_energy *= new_energy_ratio
-
+			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Infrared, 0.5 * energy)
+			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Visible, 0.4 * energy)
+			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Ultraviolet, 0.1 * energy)
 
 
 	for i in range (WORLD_BLOCK_COUNT):
@@ -895,6 +1068,20 @@ func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block
 	block_a.new_velocity_list.append([new_transition_velocity, block_a.mass * 0.5])
 	block_b.new_velocity_list.append([new_transition_velocity, block_a.mass * 0.5])
 
+func compute_light_transition(delta_time : float, block_a : Block, block_b : Block, dx : int, dy : int):
+	# Light movement, maybe move
+	if dx > 0:
+		block_b.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Right] = block_a.light_energy_by_direction[PhysicalConstants.LightDirection.Right]
+		block_a.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Left] = block_b.light_energy_by_direction[PhysicalConstants.LightDirection.Left]
+	elif dy > 0:
+		block_b.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Down] = block_a.light_energy_by_direction[PhysicalConstants.LightDirection.Down]
+		block_a.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Up] = block_b.light_energy_by_direction[PhysicalConstants.LightDirection.Up]
+	elif dx < 0:
+		block_b.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Left] = block_a.light_energy_by_direction[PhysicalConstants.LightDirection.Left]
+		block_a.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Right] = block_b.light_energy_by_direction[PhysicalConstants.LightDirection.Right]
+	elif dy < 0:
+		block_b.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Up] = block_a.light_energy_by_direction[PhysicalConstants.LightDirection.Up]
+		block_a.light_energy_by_direction_pending[PhysicalConstants.LightDirection.Down] = block_b.light_energy_by_direction[PhysicalConstants.LightDirection.Down]
 
 func get_block_at(block_x : int, block_y : int):
 	assert(block_x > -1)
