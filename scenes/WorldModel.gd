@@ -4,8 +4,8 @@ const WORLD_BLOCK_SIZE = 1000
 #const WORLD_BLOCK_DEPTH = 1000.0
 const WORLD_BLOCK_DEPTH = 1.0
 const WORLD_BLOCK_INTERFACE_SECTION = WORLD_BLOCK_SIZE * WORLD_BLOCK_DEPTH
-const WORLD_BLOCK_COUNT_X = 50
-const WORLD_BLOCK_COUNT_Y = 15
+const WORLD_BLOCK_COUNT_X = 80
+const WORLD_BLOCK_COUNT_Y = 30
 const WORLD_SIZE_X = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_SIZE
 const WORLD_SIZE_Y = WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_SIZE
 const WORLD_BLOCK_COUNT = WORLD_BLOCK_COUNT_X * WORLD_BLOCK_COUNT_Y
@@ -16,7 +16,7 @@ const WORLD_RADIUS = 100000.0
 const WORLD_BLOCK_SPHERICAL_OVERFLOW = WORLD_RADIUS - sqrt(WORLD_RADIUS*WORLD_RADIUS - WORLD_BLOCK_SIZE*WORLD_BLOCK_SIZE)
 const WORLD_BLOCK_SPHERICAL_COEF = WORLD_BLOCK_SPHERICAL_OVERFLOW / WORLD_BLOCK_SIZE
 
-const RENDER_DEBUG_SCALE = 0.05
+const RENDER_DEBUG_SCALE = 0.020
 const RENDER_DEBUG_VELOCITY_SCALE = 15
 const RENDER_DEBUG_OFFSET = Vector2(-2200, 750 - RENDER_DEBUG_SCALE * WORLD_BLOCK_SIZE * WORLD_BLOCK_COUNT_Y)
 
@@ -51,6 +51,7 @@ class Block:
 	var r_render_block : Block
 	var t_render_block : Block
 	var b_render_block : Block
+	var is_opaque
 
 
 	# dynamic
@@ -202,6 +203,11 @@ class Block:
 			velocity_amplitude = sqrt(kinetic_energy * 2 / mass)
 			velocity_cache = velocity_direction * velocity_amplitude
 
+		if is_opaque:
+			opacity = [1.0 , 1.0, 1.0]
+		else:
+			opacity = [0.8e-5 * pressure, 0.005e-5 * pressure, 0.01e-5 * pressure]
+
 	func add_give_volume_order(output_block : Block, volume : float, delta_height : float):
 		give_volume_orders.append([output_block, volume, delta_height])
 
@@ -352,7 +358,13 @@ class Block:
 
 		var light_variation_by_direction = []
 
+		var internal_energy_variation = 0
+
 		# apply pending light
+		if block_y == WORLD_BLOCK_COUNT_Y-1:
+			for light_type in range(PhysicalConstants.LightType.Count):
+				internal_energy_variation += light_energy_by_direction[PhysicalConstants.LightDirection.Down][light_type]
+
 		for light_direction in range(PhysicalConstants.LightDirection.Count):
 			light_energy_by_direction[light_direction] = light_energy_by_direction_pending[light_direction]
 			light_energy_by_direction_pending[light_direction] = [0.0,0.0,0.0]
@@ -366,6 +378,9 @@ class Block:
 			light_energy_by_direction[PhysicalConstants.LightDirection.Up][light_type] += transfered_energy
 			light_energy_by_direction[PhysicalConstants.LightDirection.Left][light_type] *= 1 - WORLD_BLOCK_SPHERICAL_COEF
 			light_energy_by_direction[PhysicalConstants.LightDirection.Right][light_type] *= 1 - WORLD_BLOCK_SPHERICAL_COEF
+
+
+
 
 		for light_direction in range(PhysicalConstants.LightDirection.Count):
 
@@ -398,11 +413,56 @@ class Block:
 				light_variation_by_direction[(light_direction + 3) % 4][light_type] += diffused_energy * 0.5
 
 				var absorbed_energy = modified_light_energy - returned_energy
-				add_internal_energy(absorbed_energy)
+				internal_energy_variation += absorbed_energy
 
 
 
 		# todo emissivity/ black body radiation
+		var T2 = temperature*temperature
+		var T4 = T2*T2
+		var opaque_radiated_energy = WORLD_BLOCK_INTERFACE_SECTION * T4 * PhysicalConstants.stephan_boltzmann_constant
+		if opaque_radiated_energy > 0:
+			var wavelenght_peak = PhysicalConstants.wien_dispacement_constant / temperature
+
+			var wavelenght_area = [0.0,0.0,0.0]
+			var one_over_total_wavelenght_area = 1 / (1.5 * wavelenght_peak)
+
+			if wavelenght_peak > PhysicalConstants.infrared_wavelength_thresold:
+				# peak in infrared
+				wavelenght_area[PhysicalConstants.LightType.Infrared] = 1.5 * wavelenght_peak - 0.5 * PhysicalConstants.infrared_wavelength_thresold * PhysicalConstants.infrared_wavelength_thresold / wavelenght_peak
+				wavelenght_area[PhysicalConstants.LightType.Ultraviolet] = 0.5 * PhysicalConstants.ultraviolet_wavelength_thresold * PhysicalConstants.ultraviolet_wavelength_thresold / wavelenght_peak
+				wavelenght_area[PhysicalConstants.LightType.Visible] = 0.5 * PhysicalConstants.infrared_wavelength_thresold * PhysicalConstants.infrared_wavelength_thresold / wavelenght_peak - wavelenght_area[PhysicalConstants.LightType.Ultraviolet]
+			elif wavelenght_peak < PhysicalConstants.ultraviolet_wavelength_thresold:
+				# peak in ultraviolet
+				var I_dist_to_3peak = 3 * wavelenght_peak - PhysicalConstants.infrared_wavelength_thresold
+				var hI = 0.5 * I_dist_to_3peak / wavelenght_peak
+
+				var V_dist_to_3peak = 3 * wavelenght_peak - PhysicalConstants.infrared_wavelength_thresold
+				var hV = 0.5 * V_dist_to_3peak / wavelenght_peak
+
+				wavelenght_area[PhysicalConstants.LightType.Infrared] = 0.5 * I_dist_to_3peak * hI
+				wavelenght_area[PhysicalConstants.LightType.Visible] = 0.5 * V_dist_to_3peak * hV - wavelenght_area[PhysicalConstants.LightType.Infrared]
+				wavelenght_area[PhysicalConstants.LightType.Ultraviolet] = 1.5 * wavelenght_peak -  0.5 * V_dist_to_3peak * hV
+			else:
+				# peak in visible
+				var I_dist_to_3peak = 3 * wavelenght_peak - PhysicalConstants.infrared_wavelength_thresold
+				var hI = 0.5 * I_dist_to_3peak / wavelenght_peak
+
+				wavelenght_area[PhysicalConstants.LightType.Infrared] = 0.5 * I_dist_to_3peak * hI
+				wavelenght_area[PhysicalConstants.LightType.Ultraviolet] = 0.5 * PhysicalConstants.ultraviolet_wavelength_thresold * PhysicalConstants.ultraviolet_wavelength_thresold / wavelenght_peak
+				wavelenght_area[PhysicalConstants.LightType.Visible] = 1.5 * wavelenght_peak - wavelenght_area[PhysicalConstants.LightType.Infrared] - wavelenght_area[PhysicalConstants.LightType.Ultraviolet]
+
+			var wavelenght_ratio = [wavelenght_area[0] * one_over_total_wavelenght_area, wavelenght_area[1] * one_over_total_wavelenght_area, wavelenght_area[2] * one_over_total_wavelenght_area]
+
+
+
+			for light_type in range(PhysicalConstants.LightType.Count):
+				var radiated_energy =  opaque_radiated_energy * wavelenght_ratio[light_type] * opacity[light_type]
+				internal_energy_variation += -4 * radiated_energy
+				for light_direction in range(PhysicalConstants.LightDirection.Count):
+					light_variation_by_direction[light_direction][light_type] += radiated_energy
+
+		add_internal_energy(internal_energy_variation)
 
 		# Apply light variation
 		for light_direction in range(PhysicalConstants.LightDirection.Count):
@@ -485,6 +545,7 @@ class Block:
 			canvas.draw_line(RENDER_DEBUG_OFFSET + start_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + end_pos * RENDER_DEBUG_SCALE, color, 1)
 
 	func draw_light_debug(canvas : CanvasItem, pos : Vector2):
+		return
 
 		var pos_positions = []
 		var center_pos = pos + Vector2(WORLD_BLOCK_SIZE * 0.5, WORLD_BLOCK_SIZE * 0.5)
@@ -611,8 +672,8 @@ class Block:
 		#canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 10), temp_text, Color(1.0,1.0,1.0,1.0))
 		#canvas.draw_string(canvas.font, RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE + Vector2(-20, 25), pressure_text, Color(1.0,1.0,1.0,1.0))
 
-		#if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
-		#	canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,1.0,1.0), false)
+#		if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
+#			canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,1.0,1.0), false)
 
 	func get_pressure_at_relative_altitude(relative_altitude : float):
 		return pressure + pressure_gradient * relative_altitude
@@ -621,6 +682,8 @@ class AtmosphericBlock extends Block:
 
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
+
+		is_opaque = false
 
 		opacity = [0.01, 0.005, 0.01]
 		albedo = [0.5, 0.2, 0.01]
@@ -643,7 +706,7 @@ class AtmosphericBlock extends Block:
 class GroundBlock extends Block:
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
-
+		is_opaque = true
 		opacity = [1.0, 1.0, 1.0]
 		albedo = [0.0, 0.0, 0.0]
 		diffusion = [0.0, 0.0, 0.0]
@@ -659,23 +722,29 @@ class GroundBlock extends Block:
 		draw_light_debug(canvas, pos)
 
 	func velocity_dumping(new_velocity : Vector2) -> Vector2:
-		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
-			return Vector2(new_velocity.x, 0)
-		else:
-			return new_velocity
+#		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
+#			return Vector2(new_velocity.x, 0)
+#		else:
+#			return new_velocity
 
-		return new_velocity * 0.9
+		return Vector2()
 
 
 
 class SurfaceBlock extends Block:
 
+	var surface_local_left_altitude
+	var surface_local_right_altitude
+	var surface_local_normal
+
 	func init():
 		gas_volume = WORLD_BLOCK_DEPTH * WORLD_BLOCK_SIZE * WORLD_BLOCK_SIZE
-
+		is_opaque = false
 		opacity = [1.0, 1.0, 1.0]
 		albedo = [0.1, 0.5, 0.01]
 		diffusion = [0.5, 0.5, 0.5]
+
+		surface_local_normal = Vector2(WORLD_BLOCK_SIZE, surface_local_right_altitude-surface_local_left_altitude).rotated(-PI/2.0).normalized()
 
 		init_with_gas(PhysicalConstants.Gas.Nitrogen, 200, 0.13e5)
 		# TODO depend on ground composition
@@ -683,22 +752,36 @@ class SurfaceBlock extends Block:
 	func draw(canvas : CanvasItem, pos : Vector2):
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(0.5, 1.0, 0.5), true)
 		draw_debug_tile(canvas, pos)
+		var left_pos = pos + Vector2(0, surface_local_left_altitude)
+		var right_pos = pos + Vector2(WORLD_BLOCK_SIZE, surface_local_right_altitude)
+		canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.3,0.6,0.3), 2)
+
+		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(0.0,1.0,1.0), false)
+		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,0.0,0.0), false)
+
 		draw_velocity_debug(canvas, pos)
 		draw_light_debug(canvas, pos)
-		var left_pos = pos + Vector2(0, WORLD_BLOCK_SIZE * 0.5)
-		var right_pos = left_pos + Vector2(WORLD_BLOCK_SIZE, 0)
-		canvas.draw_line(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + right_pos * RENDER_DEBUG_SCALE, Color(0.0,0.0,0.0), 1)
+
 
 	func velocity_dumping(new_velocity : Vector2) -> Vector2:
-		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
-			return Vector2(new_velocity.x, 0)
+#		if block_y == WORLD_BLOCK_COUNT_Y - 1 and new_velocity.y > 0:
+#			return Vector2(new_velocity.x, 0)
+#		else:
+#			return new_velocity
+
+		if new_velocity.dot(surface_local_normal) < 0:
+			var det = new_velocity.cross(surface_local_normal)
+			var dumped_velocity
+			if det > 0:
+				dumped_velocity = surface_local_normal.rotated(-PI / 2) * new_velocity.length()
+			elif det < 0:
+				dumped_velocity = surface_local_normal.rotated(PI / 2) * new_velocity.length()
+			else:
+				dumped_velocity = Vector2()
+			dumped_velocity = dumped_velocity
+			return dumped_velocity
 		else:
 			return new_velocity
-
-		if new_velocity.y > 0:
-			return Vector2(new_velocity.x * 0.99, new_velocity.y * 0.99)
-		else:
-			return Vector2(new_velocity.x * 0.99, new_velocity.y)
 
 
 
@@ -725,9 +808,10 @@ func _ready():
 	var sloop_rate = 0
 
 	for x in range (WORLD_BLOCK_COUNT_X):
-		sloop_rate += rng.randfn(0.0, 0.1) * WORLD_BLOCK_SIZE * 0.5
+		sloop_rate += rng.randfn(0.0, 0.1) * WORLD_BLOCK_SIZE * 1
 
 		sloop_rate = clamp(sloop_rate, -2 * WORLD_BLOCK_SIZE, 2 * WORLD_BLOCK_SIZE)
+		var last_altitude = altitude
 		altitude += sloop_rate
 
 		if altitude < 200 or altitude > WORLD_BLOCK_COUNT_Y * WORLD_BLOCK_SIZE - 200:
@@ -745,7 +829,10 @@ func _ready():
 			var block = GroundBlock.new()
 			blocks[x + y  * WORLD_BLOCK_COUNT_X] = block
 
-		blocks[x + max_atm_block  * WORLD_BLOCK_COUNT_X] = SurfaceBlock.new()
+		var surface_block = SurfaceBlock.new()
+		surface_block.surface_local_left_altitude = last_altitude - max_atm_block * WORLD_BLOCK_SIZE
+		surface_block.surface_local_right_altitude = altitude - max_atm_block * WORLD_BLOCK_SIZE
+		blocks[x + max_atm_block  * WORLD_BLOCK_COUNT_X] = surface_block
 
 	for i in range (WORLD_BLOCK_COUNT):
 		var block = blocks[i]
@@ -829,18 +916,28 @@ func print_world_state():
 		print("- %s Mmol" % (total_gas_N[gas] / 1e6) )
 	print("total_energy %s TJ" % (total_energy/ 1e9))
 
+var world_step_speed = 0.5
+
 func _process(delta):
 
 	if Input.is_action_just_pressed("world_debug_toogle_sun"):
 		world_enable_sun = !world_enable_sun
 		print("world_enable_sun=", world_enable_sun)
 
+	if Input.is_action_just_pressed("world_debug_increase_simulation_speed"):
+		world_step_speed *= 1.2
+		print("world_step_speed=", world_step_speed)
+
+	if Input.is_action_just_pressed("world_debug_decrease_simulation_speed"):
+		world_step_speed /= 1.2
+		print("world_step_speed=", world_step_speed)
 
 	if Input.is_action_just_pressed("world_toogle_pause"):
 		paused = !paused
+		print("paused=", paused)
 
 	if not paused or Input.is_action_just_pressed("world_step"):
-		step_world(0.5)
+		step_world(world_step_speed)
 		update()
 
 	if Input.is_action_just_pressed("world_toogle_pause") or Input.is_action_just_pressed("world_step"):
@@ -861,7 +958,7 @@ func step_world(delta_time):
 
 	# compute pressure again ?
 
-	#for x in range (WORLD_BLOCK_COUNT_X):
+	#for x in ran++--ge (WORLD_BLOCK_COUNT_X):
 	#	for y in range (WORLD_BLOCK_COUNT_Y):
 	#		compute_gas_block_movement(delta_time, x, y, get_block_at(x, y))
 
@@ -896,14 +993,15 @@ func step_world(delta_time):
 	if world_enable_sun:
 		for x in range (WORLD_BLOCK_COUNT_X):
 			var heat_alpha = sin( PI * float(x) / WORLD_BLOCK_COUNT_X)
-			heat_alpha = 1 + heat_alpha * 0.001
+			#heat_alpha = 1 + heat_alpha * 0.001
+			heat_alpha = 1
 			var surface = WORLD_BLOCK_INTERFACE_SECTION
-			var power = heat_alpha * surface * 1000000
+			var power = heat_alpha * surface * 1361 * 1000
 			var energy = delta_time * power
 			var block = get_block_at(x, 0)
 
-			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Infrared, 0.5 * energy)
-			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Visible, 0.4 * energy)
+			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Infrared, 0.1 * energy)
+			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Visible, 0.8 * energy)
 			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Ultraviolet, 0.1 * energy)
 
 

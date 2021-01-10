@@ -4,7 +4,10 @@ var gas_constant = 8.31446261815325 # Gas contant for mol J.mol-1.K-1
 var gas_adiabatic_index = 1.3;
 var gas_elastic_coef = gas_adiabatic_index / (gas_adiabatic_index - 1);
 var gravity = 9.81 # m.s-2
-
+var stephan_boltzmann_constant = 5.67e-8 # W.m-2.K-4
+var wien_dispacement_constant =  2.897771955e-3 # m⋅K
+var infrared_wavelength_thresold = 780e-9 # m
+var ultraviolet_wavelength_thresold = 380e-9 # m
 
 enum Gas {
 	#Hydrogen, #H2
