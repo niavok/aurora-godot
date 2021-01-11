@@ -350,7 +350,7 @@ class Block:
 				output_internal_energy += potential_energy_diff * (1-volume_ratio)
 		give_volume_orders = []
 
-	func apply_light_movement():
+	func apply_light_movement(delta_time):
 
 		# TODO update albedo
 
@@ -420,7 +420,7 @@ class Block:
 		# todo emissivity/ black body radiation
 		var T2 = temperature*temperature
 		var T4 = T2*T2
-		var opaque_radiated_energy = WORLD_BLOCK_INTERFACE_SECTION * T4 * PhysicalConstants.stephan_boltzmann_constant
+		var opaque_radiated_energy = WORLD_BLOCK_INTERFACE_SECTION * T4 * PhysicalConstants.stephan_boltzmann_constant * delta_time
 		if opaque_radiated_energy > 0:
 			var wavelenght_peak = PhysicalConstants.wien_dispacement_constant / temperature
 
@@ -432,6 +432,11 @@ class Block:
 				wavelenght_area[PhysicalConstants.LightType.Infrared] = 1.5 * wavelenght_peak - 0.5 * PhysicalConstants.infrared_wavelength_thresold * PhysicalConstants.infrared_wavelength_thresold / wavelenght_peak
 				wavelenght_area[PhysicalConstants.LightType.Ultraviolet] = 0.5 * PhysicalConstants.ultraviolet_wavelength_thresold * PhysicalConstants.ultraviolet_wavelength_thresold / wavelenght_peak
 				wavelenght_area[PhysicalConstants.LightType.Visible] = 0.5 * PhysicalConstants.infrared_wavelength_thresold * PhysicalConstants.infrared_wavelength_thresold / wavelenght_peak - wavelenght_area[PhysicalConstants.LightType.Ultraviolet]
+			elif wavelenght_peak * 3  < PhysicalConstants.ultraviolet_wavelength_thresold:
+				# all in ultraviolet
+				wavelenght_area[PhysicalConstants.LightType.Infrared] = 0
+				wavelenght_area[PhysicalConstants.LightType.Visible] = 00
+				wavelenght_area[PhysicalConstants.LightType.Ultraviolet] = 1.5 * wavelenght_peak
 			elif wavelenght_peak < PhysicalConstants.ultraviolet_wavelength_thresold:
 				# peak in ultraviolet
 				var I_dist_to_3peak = 3 * wavelenght_peak - PhysicalConstants.infrared_wavelength_thresold
@@ -502,9 +507,12 @@ class Block:
 
 		var new_internal_energy = internal_energy + energy
 
-		var new_energy_ratio = new_internal_energy / internal_energy
-		input_internal_energy *= new_energy_ratio
-		output_internal_energy *= new_energy_ratio
+		if internal_energy == 0:
+			input_internal_energy += new_internal_energy
+		else:
+			var new_energy_ratio = new_internal_energy / internal_energy
+			input_internal_energy *= new_energy_ratio
+			output_internal_energy *= new_energy_ratio
 
 	func give_kinetic_energy(energy, direction):
 		pending_kinetic_energy.append([energy, direction])
@@ -695,6 +703,7 @@ class AtmosphericBlock extends Block:
 	func draw(canvas : CanvasItem, pos : Vector2):
 		draw_debug_tile(canvas, pos)
 
+	func draw_debug(canvas : CanvasItem, pos : Vector2):
 		draw_velocity_debug(canvas, pos)
 
 		draw_light_debug(canvas, pos)
@@ -717,6 +726,7 @@ class GroundBlock extends Block:
 	func draw(canvas : CanvasItem, pos : Vector2):
 		draw_debug_tile(canvas, pos)
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0, 0.5, 0.5), true)
+	func draw_debug(canvas : CanvasItem, pos : Vector2):
 		draw_velocity_debug(canvas, pos)
 
 		draw_light_debug(canvas, pos)
@@ -758,6 +768,7 @@ class SurfaceBlock extends Block:
 
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(0.0,1.0,1.0), false)
 		#canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + left_pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,0.0,0.0), false)
+	func draw_debug(canvas : CanvasItem, pos : Vector2):
 
 		draw_velocity_debug(canvas, pos)
 		draw_light_debug(canvas, pos)
@@ -882,6 +893,12 @@ func _draw():
 		for y in range(WORLD_BLOCK_COUNT_Y):
 			var block = blocks[x + y  * WORLD_BLOCK_COUNT_X]
 			block.draw(self, Vector2(x * WORLD_BLOCK_SIZE, y * WORLD_BLOCK_SIZE))
+	for x in range (WORLD_BLOCK_COUNT_X):
+		for y in range(WORLD_BLOCK_COUNT_Y):
+			var block = blocks[x + y  * WORLD_BLOCK_COUNT_X]
+			block.draw_debug(self, Vector2(x * WORLD_BLOCK_SIZE, y * WORLD_BLOCK_SIZE))
+			if x == DEBUG_BLOCK_X and y == DEBUG_BLOCK_Y:
+				block.draw_tile_highlight(self, Vector2(x * WORLD_BLOCK_SIZE, y * WORLD_BLOCK_SIZE))
 
 
 var paused  = true
@@ -983,7 +1000,7 @@ func step_world(delta_time):
 
 	for i in range (WORLD_BLOCK_COUNT):
 		blocks[i].apply_gas_movement()
-		blocks[i].apply_light_movement()
+		blocks[i].apply_light_movement(delta_time)
 
 
 
@@ -994,7 +1011,7 @@ func step_world(delta_time):
 		for x in range (WORLD_BLOCK_COUNT_X):
 			var heat_alpha = sin( PI * float(x) / WORLD_BLOCK_COUNT_X)
 			#heat_alpha = 1 + heat_alpha * 0.001
-			heat_alpha = 1
+			#heat_alpha = 1
 			var surface = WORLD_BLOCK_INTERFACE_SECTION
 			var power = heat_alpha * surface * 1361 * 1000
 			var energy = delta_time * power
@@ -1004,11 +1021,21 @@ func step_world(delta_time):
 			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Visible, 0.8 * energy)
 			block.add_light(PhysicalConstants.LightDirection.Down, PhysicalConstants.LightType.Ultraviolet, 0.1 * energy)
 
+	var max_velocity_block_id
+	var max_velocity_sq = -1
 
 	for i in range (WORLD_BLOCK_COUNT):
-		var block = blocks[i]
+		var block : Block = blocks[i]
 		block.integrate_pending()
 		block.update_cache()
+		if block.velocity_cache.length_squared() > max_velocity_sq:
+			max_velocity_sq = block.velocity_cache.length_squared()
+			max_velocity_block_id = i
+
+
+	print("max vel="+str(sqrt(max_velocity_sq)))
+	DEBUG_BLOCK_X = max_velocity_block_id % WORLD_BLOCK_COUNT_X
+	DEBUG_BLOCK_Y = max_velocity_block_id / WORLD_BLOCK_COUNT_X
 
 
 	#var debug_block = get_block_at(DEBUG_BLOCK_X, DEBUG_BLOCK_Y)
@@ -1032,102 +1059,6 @@ func get_relative_force(block_x : int, block_y : int, dx : int, dy: int, dir_and
 	var force = delta_pressure * WORLD_BLOCK_INTERFACE_SECTION  # Pa * m2 = N
 	var directional_force = force * dir_and_coef
 	return directional_force
-
-
-func compute_gas_block_movement(delta_time : float, block_x : int, block_y : int, block : Block):
-
-	var forces = Vector2()
-
-	if block.mass > 0:
-		forces += get_relative_force(block_x, block_y, -1, -1, Vector2( 0.5, 0.5), block)
-		forces += get_relative_force(block_x, block_y,  1, -1, Vector2(-0.5, 0.5), block)
-		forces += get_relative_force(block_x, block_y,  1,  1, Vector2(-0.5,-0.5), block)
-		forces += get_relative_force(block_x, block_y, -1,  1, Vector2( 0.5,-0.5), block)
-
-		forces += get_relative_force(block_x, block_y,  1,  0, Vector2(-1,0), block)
-		forces += get_relative_force(block_x, block_y, -1,  0, Vector2(1,0), block)
-		forces += get_relative_force(block_x, block_y,  0,  1, Vector2(0,-1), block)
-		forces += get_relative_force(block_x, block_y,  0, -1, Vector2(0,1), block)
-
-
-		var forces_acceleration = forces / block.mass
-
-		var acceleration = Vector2(0, 9.81) + forces_acceleration
-
-
-		var new_velocity = block.velocity_cache + acceleration * delta_time
-
-		# debug dumping
-		new_velocity *= 0.97
-
-
-		var top_block = get_block_at_with_wrapping(block_x, block_y -1)
-		var bottom_block = get_block_at_with_wrapping(block_x, block_y + 1)
-		var left_block =  get_block_at_with_wrapping(block_x - 1, block_y)
-		var right_block = get_block_at_with_wrapping(block_x + 1, block_y)
-
-		if not top_block and new_velocity.y < 0:
-			new_velocity.y = 0
-		if not bottom_block and new_velocity.y > 0:
-			new_velocity.y = 0
-
-		var new_kinetic_energy = 0.5 * block.mass * new_velocity.length_squared()
-
-		var kinetic_energy_diff = new_kinetic_energy - block.kinetic_energy
-
-		var internal_energy = block.input_internal_energy + block.output_internal_energy
-
-		block.kinetic_energy = new_kinetic_energy
-		block.velocity_direction =new_velocity.normalized()
-
-		var remaining_internal_energy = internal_energy - kinetic_energy_diff
-
-		var new_energy_ratio = remaining_internal_energy / internal_energy
-		block.input_internal_energy *= new_energy_ratio
-		block.output_internal_energy *= new_energy_ratio
-
-		# Apply movement
-		#TODO
-		var block_movement = new_velocity * delta_time
-
-		block_movement.x = clamp(block_movement.x, -WORLD_BLOCK_SIZE*0.5, WORLD_BLOCK_SIZE*0.5)
-		block_movement.y = clamp(block_movement.y, -WORLD_BLOCK_SIZE*0.5, WORLD_BLOCK_SIZE*0.5)
-
-		# Top and bottom volume
-
-
-		var top_volume = block_movement.y * (WORLD_BLOCK_SIZE - abs(block_movement.x)) * WORLD_BLOCK_DEPTH
-		var left_volume = block_movement.x * (WORLD_BLOCK_SIZE - abs(block_movement.y)) * WORLD_BLOCK_DEPTH
-
-		if top_block:
-			transfert_block_volume(block, top_block, -top_volume * 0.5, -WORLD_BLOCK_SIZE)
-		if bottom_block:
-			transfert_block_volume(block, bottom_block, top_volume * 0.5, WORLD_BLOCK_SIZE)
-		if left_block:
-			transfert_block_volume(block, left_block, -left_volume * 0.5, 0)
-		if right_block:
-			transfert_block_volume(block, right_block, left_volume * 0.5, 0)
-
-		if sign(block_movement.y) ==  sign(block_movement.x):
-			# Top left diagonal
-			var diagonal_volume = sign(block_movement.x) * block_movement.y * block_movement.x * WORLD_BLOCK_DEPTH
-			if diagonal_volume != 0:
-				var top_left_block = get_block_at_with_wrapping(block_x-1, block_y -1)
-				var bottom_right_block = get_block_at_with_wrapping(block_x + 1, block_y + 1)
-				if top_left_block:
-					transfert_block_volume(block, top_left_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
-				if bottom_right_block:
-					transfert_block_volume(block, bottom_right_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
-		else:
-			# Top right diagonal
-			var diagonal_volume = sign(block_movement.x) * block_movement.y * block_movement.x * WORLD_BLOCK_DEPTH
-			if diagonal_volume != 0:
-				var top_right_block = get_block_at_with_wrapping(block_x+1, block_y -1)
-				var bottom_left_block = get_block_at_with_wrapping(block_x - 1, block_y + 1)
-				if top_right_block:
-					transfert_block_volume(block, top_right_block, -diagonal_volume * 0.5, -WORLD_BLOCK_SIZE)
-				if bottom_left_block:
-					transfert_block_volume(block, bottom_left_block, diagonal_volume * 0.5, WORLD_BLOCK_SIZE)
 
 func compute_gas_transition(delta_time : float, block_a : Block, block_b : Block, dx : int, dy : int):
 
