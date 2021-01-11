@@ -206,7 +206,7 @@ class Block:
 		if is_opaque:
 			opacity = [1.0 , 1.0, 1.0]
 		else:
-			opacity = [0.8e-5 * pressure, 0.005e-5 * pressure, 0.01e-5 * pressure]
+			opacity = [0.1e-5 * pressure, 0.005e-5 * pressure, 0.01e-5 * pressure]
 
 	func add_give_volume_order(output_block : Block, volume : float, delta_height : float):
 		give_volume_orders.append([output_block, volume, delta_height])
@@ -214,8 +214,8 @@ class Block:
 
 	func apply_gas_movement():
 
-		if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
-			pass
+		#if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
+		#	pass
 
 		var new_velocity_sum = Vector2()
 		var new_velocity_mass_sum = 0
@@ -682,6 +682,9 @@ class Block:
 
 #		if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
 #			canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,1.0,1.0), false)
+	func draw_tile_highlight(canvas : CanvasItem, pos : Vector2):
+		#if block_x == DEBUG_BLOCK_X and block_y == DEBUG_BLOCK_Y:
+		canvas.draw_rect(Rect2(RENDER_DEBUG_OFFSET + pos * RENDER_DEBUG_SCALE, Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * RENDER_DEBUG_SCALE), Color(1.0,0.0,1.0), false)
 
 	func get_pressure_at_relative_altitude(relative_altitude : float):
 		return pressure + pressure_gradient * relative_altitude
