@@ -1,3 +1,0 @@
-[submodule "src/cpp_bindings"]
-	path = auroralib/cpp_bindings
-	url = https://github.com/GodotNativeTools/cpp_bindings
