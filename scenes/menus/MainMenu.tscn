@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=2]
+[gd_scene load_steps=7 format=2]
 
 [ext_resource path="res://fonts/MenuTitleFont.tres" type="DynamicFont" id=1]
 [ext_resource path="res://fonts/MenuPrimaryButton.tres" type="DynamicFont" id=2]
 [ext_resource path="res://scripts/menus/MainMenu.gd" type="Script" id=3]
 [ext_resource path="res://scenes/menus/CreditLabel.tscn" type="PackedScene" id=4]
+[ext_resource path="res://icon.png" type="Texture" id=5]
+[ext_resource path="res://bin/auroralib.gdns" type="Script" id=6]
 
 [node name="MainMenu" type="Control"]
 anchor_right = 1.0
@@ -122,6 +124,11 @@ anchor_left = 0.95
 anchor_top = 0.95
 anchor_right = 0.95
 anchor_bottom = 0.95
+
+[node name="Sprite" type="Sprite" parent="CanvasLayer"]
+texture = ExtResource( 5 )
+centered = false
+script = ExtResource( 6 )
 [connection signal="pressed" from="CanvasLayer/NewGameButton" to="." method="_on_NewGameButton_pressed"]
 [connection signal="pressed" from="CanvasLayer/SettingsButton" to="." method="_on_SettingsButton_pressed"]
 [connection signal="pressed" from="CanvasLayer/QuitGameButton" to="." method="_on_QuitGameButton_pressed"]

@@ -21,7 +21,7 @@ data_*/
 # auroralib
 
 auroralib/.sconsign.dblite
-auroralib/bin/win64
+bin/win64
 *.obj
 *.idb
 *.pdb
