@@ -1,0 +1,3 @@
+[submodule "auroralib/godot-cpp"]
+	path = auroralib/godot-cpp
+	url = https://github.com/godotengine/godot-cpp

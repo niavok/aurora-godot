@@ -17,3 +17,11 @@ export_presets.cfg
 data_*/
 
 # End of https://www.toptal.com/developers/gitignore/api/godot
+
+# auroralib
+
+auroralib/.sconsign.dblite
+auroralib/bin/win64
+*.obj
+*.idb
+*.pdb
