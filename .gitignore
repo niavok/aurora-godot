@@ -25,3 +25,8 @@ bin/win64
 *.obj
 *.idb
 *.pdb
+auroralib/.vs
+auroralib/
+*.vsxproj
+*.vsxproj.filters
+*.sln

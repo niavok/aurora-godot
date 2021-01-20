@@ -8,10 +8,11 @@ env = DefaultEnvironment()
 
 # Define our options
 opts.Add(EnumVariable('target', "Compilation target", 'debug', ['d', 'debug', 'r', 'release']))
-opts.Add(EnumVariable('platform', "Compilation platform", '', ['', 'windows', 'x11', 'linux', 'osx']))
+opts.Add(EnumVariable('platform', "Compilation platform", 'windows', ['', 'windows', 'x11', 'linux', 'osx']))
 opts.Add(EnumVariable('p', "Compilation target, alias for 'platform'", '', ['', 'windows', 'x11', 'linux', 'osx']))
 opts.Add(BoolVariable('use_llvm', "Use the LLVM / Clang compiler", 'no'))
 opts.Add(PathVariable('target_path', 'The path where the lib is installed.', '../bin/'))
+opts.Add(BoolVariable("vsproj", "Generate a Visual Studio solution", False))
 opts.Add(PathVariable('target_name', 'The library name.', 'libgdexample', PathVariable.PathAccept))
 
 # Local dependency paths, adapt them to your setup
@@ -101,6 +102,32 @@ env.Append(CPPPATH=['src/'])
 sources = Glob('src/*.cpp')
 
 library = env.SharedLibrary(target=env['target_path'] + env['target_name'] , source=sources)
+
+if env["vsproj"]:
+
+    msvc_sources = []
+    msvc_includes = []
+
+    for x in sources:
+        msvc_sources.append(x.path)
+
+    for x in Glob('src/*.h'):
+        msvc_includes.append(x.path)
+
+    buildtarget = [s for s in library if str(s).endswith('dll')]
+
+   # env["MSVSBUILDCOM"] = "platform=windows"
+
+    prj1 = env.MSVSProject(target = "auroralib" + env['MSVSPROJECTSUFFIX'],
+                               srcs = msvc_sources,
+                               incs = msvc_includes,
+                               localincs = [''],
+                               resources = [''],
+                               misc = [''],
+                               buildtarget = buildtarget,
+                               variant = 'Debug|x64',
+                               auto_build_solution=1)
+    Default(prj1)
 
 Default(library)
 
