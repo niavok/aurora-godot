@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=2]
+[gd_scene load_steps=7 format=2]
 
 [ext_resource path="res://addons/echo_plugin/not_sticky_static_body_2d.gd" type="Script" id=1]
 [ext_resource path="res://sprites/test_home.png" type="Texture" id=2]
 [ext_resource path="res://scenes/tools/LevelExit.tscn" type="PackedScene" id=3]
+[ext_resource path="res://bin/fluids.gdns" type="Script" id=4]
 
 [sub_resource type="RectangleShape2D" id=1]
 extents = Vector2( 68.5559, 139.495 )
@@ -97,6 +98,10 @@ collision_mask = 256
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="MainLevel/NoFlyZone"]
 polygon = PoolVector2Array( -2835.94, -417.499, -2301.97, -561.585, -1653.58, -608.202, -941.623, -599.726, 300.068, -595.488, 1423.1, -591.25, 2140.69, -1050.87, 2492.69, -1141.25, 2487.94, -1678.77, 922.939, -1669.26, -37.9404, -1635.96, -1284.23, -1578.88, -2230.84, -1545.58, -2934.85, -1388.61 )
+
+[node name="Fluids" type="Sprite" parent="MainLevel"]
+position = Vector2( -2043.69, 146.834 )
+script = ExtResource( 4 )
 
 [node name="Background" type="CanvasLayer" parent="."]
 layer = -2
