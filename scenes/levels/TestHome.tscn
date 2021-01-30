@@ -100,8 +100,13 @@ collision_mask = 256
 polygon = PoolVector2Array( -2835.94, -417.499, -2301.97, -561.585, -1653.58, -608.202, -941.623, -599.726, 300.068, -595.488, 1423.1, -591.25, 2140.69, -1050.87, 2492.69, -1141.25, 2487.94, -1678.77, 922.939, -1669.26, -37.9404, -1635.96, -1284.23, -1578.88, -2230.84, -1545.58, -2934.85, -1388.61 )
 
 [node name="Fluids" type="Sprite" parent="MainLevel"]
-position = Vector2( -2043.69, 146.834 )
+position = Vector2( -2663.99, -110.875 )
 script = ExtResource( 4 )
+diffusion_coef = 0.001
+viscosity_coef = 0.01
+RENDER_DEBUG_VELOCITY_SCALE = 0.01
+m_worldStepDt = 0.01
+RENDER_DEBUG_DENSITY = 0.8
 
 [node name="Background" type="CanvasLayer" parent="."]
 layer = -2

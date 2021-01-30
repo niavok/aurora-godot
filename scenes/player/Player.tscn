@@ -125,6 +125,7 @@ shape = SubResource( 5 )
 [node name="RenderRoot" type="Node2D" parent="."]
 
 [node name="Body" type="Sprite" parent="RenderRoot"]
+visible = false
 position = Vector2( 0.375, -3 )
 scale = Vector2( 0.18, 0.18 )
 texture = ExtResource( 6 )

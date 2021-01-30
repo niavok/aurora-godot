@@ -26,7 +26,7 @@ bin/win64
 *.idb
 *.pdb
 auroralib/.vs
-auroralib/
+auroralib/x64
 *.vsxproj
 *.vsxproj.filters
 *.sln
