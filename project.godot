@@ -75,6 +75,10 @@ Settings="*res://scripts/Settings.gd"
 GameGlobals="*res://scripts/GameGlobals.gd"
 PhysicalConstants="*res://scripts/physics/PhysicalConstants.gd"
 
+[debug]
+
+settings/stdout/print_fps=true
+
 [display]
 
 window/size/width=1920

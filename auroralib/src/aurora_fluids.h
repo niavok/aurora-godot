@@ -4,23 +4,11 @@
 #include <Godot.hpp>
 #include <Sprite.hpp>
 
+#include "aurora_fluid_box.h"
+
 namespace godot {
 
-
-struct FluidBox {
-    int size;
-    
-    float* s[3];
-    float* density[3];
-
-    float* Vx;
-    float* Vy;
-
-    float* Vx0;
-    float* Vy0;
-};
-
-class Fluids : public Sprite {
+    class Fluids : public Sprite {
     GODOT_CLASS(Fluids, Sprite)
 
 public:
@@ -39,7 +27,7 @@ private:
     void PrintWorldState();
     
     FluidBox* m_fluidBox;
-    size_t m_size;
+    int m_size;
     bool m_worldEnableSun = false;
     bool m_paused = true;
     
