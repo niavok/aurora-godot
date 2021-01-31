@@ -6,7 +6,7 @@ namespace godot {
 
 class FluidBox {
 public:
-    FluidBox(int size);
+    FluidBox(int sizeX, int sizeY);
     ~FluidBox();
 
     void AddDensity(int x, int y, float amount, int color);
@@ -21,9 +21,11 @@ public:
     float* Vx;
     float* Vy;
 
+    int m_sizeX;
+    int m_sizeY;
+
 private:
     
-
     void SetBound(int b, float* x);
     void LinearSolve(int b, float* x, float* x0, float a, float c);
 
@@ -31,7 +33,6 @@ private:
     void Project(float* velocX, float* velocY, float* p, float* div);
     void Advect(int b, float* d, float* d0, float* velocX, float* velocY, float dt);
 
-    int m_size;
     int m_linearSolveIter;
     float* s[3];
   

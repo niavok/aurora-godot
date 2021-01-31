@@ -27,7 +27,6 @@ private:
     void PrintWorldState();
     
     FluidBox* m_fluidBox;
-    int m_size;
     bool m_worldEnableSun = false;
     bool m_paused = true;
     

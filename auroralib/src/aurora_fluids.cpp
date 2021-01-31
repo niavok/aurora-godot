@@ -25,9 +25,8 @@ void Fluids::_register_methods() {
 
 
 Fluids::Fluids()
-    : m_size(200)
 {
-    m_fluidBox = new FluidBox(m_size);
+    m_fluidBox = new FluidBox(600, 160);
 }
 
 Fluids::~Fluids() {
@@ -124,48 +123,50 @@ void Fluids::StepWorld(float dt)
     //    }
     //}
 
-
-    for (int j = 0; j < 20; j++)
+    if (m_worldEnableSun)
     {
-        for (int i = 0; i < 10; i++)
+        for (int j = 0; j < 20; j++)
         {
-            m_fluidBox->AddDensity(50 + i, 100 + j, 200.0f * dt, 0);
+            for (int i = 0; i < 10; i++)
+            {
+                m_fluidBox->AddDensity(50 + i, 100 + j, 200.0f * dt, 0);
 
-            Vector2 direction(1, yO / 20.f);
-            
-
-            float vel = 20000.f * dt;
-            m_fluidBox->AddVelocity(50 + i, 100 + j, direction.x * vel, direction.y * vel);
+                Vector2 direction(1, yO / 20.f);
 
 
-     
+                float vel = 20000.f * dt;
+                m_fluidBox->AddVelocity(50 + i, 100 + j, direction.x * vel, direction.y * vel);
+
+
+
+            }
         }
-    }
 
-    for (int j = 0; j < 8; j++)
-    {
-        for (int i = 0; i < 8; i++)
+        for (int j = 0; j < 8; j++)
         {
+            for (int i = 0; i < 8; i++)
+            {
 
-            m_fluidBox->AddDensity(150 + i, 80 + j, 200.0f * dt, 1);
+                m_fluidBox->AddDensity(150 + i, 80 + j, 200.0f * dt, 1);
 
-            Vector2 directionB(-1, yB / 10);
-            //Vector2 directionB;
-            //directionB.set_rotation(totalDuration * 5);
-            float velB = 10000.f * dt;
+                Vector2 directionB(-1, yB / 10);
+                //Vector2 directionB;
+                //directionB.set_rotation(totalDuration * 5);
+                float velB = 10000.f * dt;
 
-            m_fluidBox->AddVelocity(150 + i, 80 + j, directionB.x * velB, directionB.y * velB);
+                m_fluidBox->AddVelocity(150 + i, 80 + j, directionB.x * velB, directionB.y * velB);
 
+            }
         }
-    }
 
-    for (int j = 0; j < 8; j++)
-    {
-        for (int i = 0; i < 8; i++)
+        for (int j = 0; j < 8; j++)
         {
+            for (int i = 0; i < 8; i++)
+            {
 
-            m_fluidBox->AddDensity(100 + i, 150 + j, 200.0f * dt, 2);
+                m_fluidBox->AddDensity(100 + i, 150 + j, 200.0f * dt, 2);
 
+            }
         }
     }
 
@@ -190,22 +191,25 @@ void Fluids::_draw()
     //float RENDER_DEBUG_SCALE = scale;
     //Vector2 RENDER_DEBUG_OFFSET(offetX, offetY);
     
-    for (int j = 0; j < m_size; j+=3)
+    for (int j = 0; j < m_fluidBox->m_sizeY; j+=4)
     {
-        for (int i = 0; i < m_size; i+= 3)
+        for (int i = 0; i < m_fluidBox->m_sizeX; i+= 4)
         {
             //Color tileColor(0.f, m_fluidBox->density[Index(i, j)] / 100.f, 0.f);
             //Color tileColor(m_fluidBox->Vx[Index(i, j)] / 10.f, m_fluidBox->density[Index(i, j)] / 100.f, m_fluidBox->Vy[Index(i, j)] / 10.f);
             //
             Vector2 velocity(m_fluidBox->Vx[m_fluidBox->Index(i, j)], m_fluidBox->Vy[m_fluidBox->Index(i, j)]);
 
+            if (velocity.length_squared() < 1e-5)
+            {
+                continue;
+            }
+
             float velocityAngle = velocity.angle();
 
             float red = 0.5f * (1 + sinf(velocityAngle));
             float green = 0.5f * (1 + sinf(velocityAngle + 2 * float(Math_PI) / 3.0f)); //  + 60°
             float blue = 0.5f * (1 + sinf(velocityAngle + 4 * float(Math_PI) / 3.0f)); //  + 120°
-
-            Color velocityColor(red, green, blue, velocity.length() / 10.f);
 
 
             Color color(red, green, blue);
@@ -231,17 +235,19 @@ void Fluids::_draw()
         }
     }
 
-    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x + RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET.y + RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE * (m_size - 2), RENDER_DEBUG_SCALE * (m_size - 2)), Color(1.f, 0.f, 0.f), false);
-    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x, RENDER_DEBUG_OFFSET.y, RENDER_DEBUG_SCALE * m_size, RENDER_DEBUG_SCALE * m_size), Color(1.f, 1.f, 1.f), false);
+    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x + RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET.y + RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE * (m_fluidBox->m_sizeX - 2), RENDER_DEBUG_SCALE * (m_fluidBox->m_sizeY - 2)), Color(1.f, 0.f, 0.f), false);
+    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x, RENDER_DEBUG_OFFSET.y, RENDER_DEBUG_SCALE * m_fluidBox->m_sizeX, RENDER_DEBUG_SCALE * m_fluidBox->m_sizeY), Color(1.f, 1.f, 1.f), false);
 
-    float offetX = RENDER_DEBUG_SCALE * m_size + 1;
+    //float offetX = RENDER_DEBUG_SCALE * m_fluidBox->m_sizeX + 1;
+    float offetX = 0;
+    float offetY = RENDER_DEBUG_SCALE * m_fluidBox->m_sizeY + 1;
 
 
     float opacityCoeff = RENDER_DEBUG_DENSITY / (30 + totalDuration);
 
-    for (int j = 0; j < m_size; j++)
+    for (int j = 0; j < m_fluidBox->m_sizeY; j++)
     {
-        for (int i = 0; i < m_size; i++)
+        for (int i = 0; i < m_fluidBox->m_sizeX; i++)
         {
             //Color tileColor(0.f, m_fluidBox->density[Index(i, j)] / 100.f, 0.f);
             //float value = m_fluidBox->density[Index(i, j)] / 100.f;
@@ -255,12 +261,12 @@ void Fluids::_draw()
 
             Color tileColor(dyeColor.x, dyeColor.y, dyeColor.z, density * opacityCoeff);
 
-            draw_rect(Rect2(RENDER_DEBUG_OFFSET.x + offetX + i * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET.y + j * RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE), tileColor, true);
+            draw_rect(Rect2(RENDER_DEBUG_OFFSET.x + offetX + i * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET.y+ offetY + j * RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE), tileColor, true);
         }
     }
 
-    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x +offetX + RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET.y + RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE * (m_size - 2), RENDER_DEBUG_SCALE * (m_size - 2)), Color(1.f, 0.f, 0.f), false);
-    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x + offetX, RENDER_DEBUG_OFFSET.y, RENDER_DEBUG_SCALE * m_size, RENDER_DEBUG_SCALE * m_size), Color(1.f, 1.f, 1.f), false);
+    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x +offetX + RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET.y + offetY  + RENDER_DEBUG_SCALE, RENDER_DEBUG_SCALE * (m_fluidBox->m_sizeX - 2), RENDER_DEBUG_SCALE * (m_fluidBox->m_sizeY - 2)), Color(1.f, 0.f, 0.f), false);
+    draw_rect(Rect2(RENDER_DEBUG_OFFSET.x + offetX, RENDER_DEBUG_OFFSET.y + offetY, RENDER_DEBUG_SCALE * m_fluidBox->m_sizeX, RENDER_DEBUG_SCALE * m_fluidBox->m_sizeY), Color(1.f, 1.f, 1.f), false);
 
 }
 
