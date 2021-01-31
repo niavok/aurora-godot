@@ -6,7 +6,7 @@ namespace godot {
 
 class FluidBox {
 public:
-    FluidBox(int sizeX, int sizeY);
+    FluidBox(int sizeX, int sizeY, bool isHorizontalLoop);
     ~FluidBox();
 
     void AddDensity(int x, int y, float amount, int color);
@@ -15,6 +15,7 @@ public:
     void Step(float dt, float diff, float visc);
 
     int Index(int x, int y);
+    int IndexLoop(int x, int y);
 
     float* density[3];
 
@@ -34,7 +35,10 @@ private:
     void Advect(int b, float* d, float* d0, float* velocX, float* velocY, float dt);
 
     int m_linearSolveIter;
+    bool m_isHorizontalLoop;
     float* s[3];
+
+    int m_sizeXMask;
   
 
     float* Vx0;

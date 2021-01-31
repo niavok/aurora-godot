@@ -1,15 +1,23 @@
 #include "aurora_fluid_box.h"
 
 #include <math.h>
+#include <cassert>
 
 namespace godot
 {
 
-FluidBox::FluidBox(int sizeX, int sizeY)
+FluidBox::FluidBox(int sizeX, int sizeY, bool isHorizontalLoop)
     : m_sizeX(sizeX)
     , m_sizeY(sizeY)
-    , m_linearSolveIter(15)
+    , m_linearSolveIter(10)
+    , m_isHorizontalLoop(isHorizontalLoop)
 {
+    if(isHorizontalLoop)
+    {
+        assert((sizeX & (sizeX - 1)) == 0); // Ensure sizeX is power of 2 if loop
+        m_sizeXMask = m_sizeX - 1;
+    }
+
     int area = m_sizeX * m_sizeY;
 
     for (int i = 0; i < 3; i++)
@@ -61,6 +69,10 @@ int FluidBox::Index(int x, int y)
 	return x + y * m_sizeX;
 }
 
+int FluidBox::IndexLoop(int x, int y)
+{
+    return (x & m_sizeXMask) + y * m_sizeX;
+}
 
 void FluidBox::AddDensity(int x, int y, float amount, int color)
 {
@@ -80,37 +92,66 @@ void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
 
 void FluidBox::SetBound(int b, float* x)
 {
-    for (int i = 1; i < m_sizeX - 1; i++) {
-        x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
-        x[Index(i, m_sizeY - 1)] = b == 2 ? -x[Index(i, m_sizeY - 2)] : x[Index(i, m_sizeY - 2)];
+    if (m_isHorizontalLoop)
+    {
+        for (int i = 0; i < m_sizeX; i++) {
+            x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
+            x[Index(i, m_sizeY - 1)] = b == 2 ? -x[Index(i, m_sizeY - 2)] : x[Index(i, m_sizeY - 2)];
+        }
     }
+    else
+    {
+        for (int i = 1; i < m_sizeX - 1; i++) {
+            x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
+            x[Index(i, m_sizeY - 1)] = b == 2 ? -x[Index(i, m_sizeY - 2)] : x[Index(i, m_sizeY - 2)];
+        }
+    
+        for (int j = 1; j < m_sizeY - 1; j++) {
+            x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
+            x[Index(m_sizeX - 1, j)] = b == 1 ? -x[Index(m_sizeX - 2, j)] : x[Index(m_sizeX - 2, j)];
+        }
 
-    for (int j = 1; j < m_sizeY - 1; j++) {
-        x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
-        x[Index(m_sizeX - 1, j)] = b == 1 ? -x[Index(m_sizeX - 2, j)] : x[Index(m_sizeX - 2, j)];
+
+        x[Index(0, 0)] = 0.5f * (x[Index(1, 0)] + x[Index(0, 1)]);
+        x[Index(0, m_sizeY - 1)] = 0.5f * (x[Index(1, m_sizeY - 1)] + x[Index(0, m_sizeY - 2)]);
+        x[Index(m_sizeX - 1, 0)] = 0.5f * (x[Index(m_sizeX - 2, 0)] + x[Index(m_sizeX - 1, 1)]);
+        x[Index(m_sizeX - 1, m_sizeY - 1)] = 0.5f * (x[Index(m_sizeX - 2, m_sizeY - 1)] + x[Index(m_sizeX - 1, m_sizeY - 2)]);
     }
-
-
-    x[Index(0, 0)] = 0.5f * (x[Index(1, 0)] + x[Index(0, 1)]);
-    x[Index(0, m_sizeY - 1)] = 0.5f * (x[Index(1, m_sizeY - 1)] + x[Index(0, m_sizeY - 2)]);
-    x[Index(m_sizeX - 1, 0)] = 0.5f * (x[Index(m_sizeX - 2, 0)] + x[Index(m_sizeX - 1, 1)]);
-    x[Index(m_sizeX - 1, m_sizeY - 1)] = 0.5f * (x[Index(m_sizeX - 2, m_sizeY - 1)] + x[Index(m_sizeX - 1, m_sizeY - 2)]);
 }
 
 void FluidBox::LinearSolve(int b, float* x, float* x0, float a, float c)
 {
     float cRecip = 1.0f / c;
-    for (int k = 0; k < m_linearSolveIter; k++) {
-        for (int j = 1; j < m_sizeY - 1; j++) {
-            for (int i = 1; i < m_sizeX - 1; i++) {
-                x[Index(i, j)] =
-                    (x0[Index(i, j)]
-                        + a * (x[Index(i + 1, j)] + x[Index(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
-                        ) * cRecip;
-            }
-        }
 
-        SetBound(b, x);
+    if (m_isHorizontalLoop)
+    {
+        for (int k = 0; k < m_linearSolveIter; k++) {
+            for (int j = 1; j < m_sizeY - 1; j++) {
+                for (int i = 0; i < m_sizeX; i++) {
+                    x[Index(i, j)] =
+                        (x0[Index(i, j)]
+                            + a * (x[IndexLoop(i + 1, j)] + x[IndexLoop(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
+                            ) * cRecip;
+                }
+            }
+
+            SetBound(b, x);
+        }
+    }
+    else
+    {
+        for (int k = 0; k < m_linearSolveIter; k++) {
+            for (int j = 1; j < m_sizeY - 1; j++) {
+                for (int i = 1; i < m_sizeX - 1; i++) {
+                    x[Index(i, j)] =
+                        (x0[Index(i, j)]
+                            + a * (x[Index(i + 1, j)] + x[Index(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
+                            ) * cRecip;
+                }
+            }
+
+            SetBound(b, x);
+        }
     }
 }
 
@@ -144,26 +185,55 @@ void FluidBox::Diffuse(int b, float* x, float* x0, float diff, float dt)
 void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
 {
     // If not stable, restore h scale from original code
-    for (int j = 1; j < m_sizeY - 1; j++) {
-        for (int i = 1; i < m_sizeX - 1; i++) {
-            div[Index(i, j)] = -0.5f * (
-                velocX[Index(i + 1, j)]
-                - velocX[Index(i - 1, j)]
-                + velocY[Index(i, j + 1)]
-                - velocY[Index(i, j - 1)]
-                );
-            p[Index(i, j)] = 0;
+
+    if (!m_isHorizontalLoop)
+    {
+        for (int j = 1; j < m_sizeY - 1; j++) {
+            for (int i = 1; i < m_sizeX - 1; i++) {
+                div[Index(i, j)] = -0.5f * (
+                    velocX[Index(i + 1, j)]
+                    - velocX[Index(i - 1, j)]
+                    + velocY[Index(i, j + 1)]
+                    - velocY[Index(i, j - 1)]
+                    );
+                p[Index(i, j)] = 0;
+            }
+        }
+
+        SetBound(0, div);
+        SetBound(0, p);
+        LinearSolve(0, p, div, 1, 4);
+
+        for (int j = 1; j < m_sizeY - 1; j++) {
+            for (int i = 1; i < m_sizeX - 1; i++) {
+                velocX[Index(i, j)] -= 0.5f * (p[Index(i + 1, j)] - p[Index(i - 1, j)]);
+                velocY[Index(i, j)] -= 0.5f * (p[Index(i, j + 1)] - p[Index(i, j - 1)]);
+            }
         }
     }
+    else
+    {
+        for (int j = 1; j < m_sizeY - 1; j++) {
+            for (int i = 0; i < m_sizeX; i++) {
+                div[Index(i, j)] = -0.5f * (
+                    velocX[IndexLoop(i + 1, j)]
+                    - velocX[IndexLoop(i - 1, j)]
+                    + velocY[Index(i, j + 1)]
+                    - velocY[Index(i, j - 1)]
+                    );
+                p[Index(i, j)] = 0;
+            }
+        }
 
-    SetBound(0, div);
-    SetBound(0, p);
-    LinearSolve(0, p, div, 1, 4);
+        SetBound(0, div);
+        SetBound(0, p);
+        LinearSolve(0, p, div, 1, 4);
 
-    for (int j = 1; j < m_sizeY - 1; j++) {
-        for (int i = 1; i < m_sizeX - 1; i++) {
-            velocX[Index(i, j)] -= 0.5f * (p[Index(i + 1, j)] - p[Index(i - 1, j)]);
-            velocY[Index(i, j)] -= 0.5f * (p[Index(i, j + 1)] - p[Index(i, j - 1)]);
+        for (int j = 1; j < m_sizeY - 1; j++) {
+            for (int i = 0; i < m_sizeX; i++) {
+                velocX[Index(i, j)] -= 0.5f * (p[IndexLoop(i + 1, j)] - p[IndexLoop(i - 1, j)]);
+                velocY[Index(i, j)] -= 0.5f * (p[Index(i, j + 1)] - p[Index(i, j - 1)]);
+            }
         }
     }
 
@@ -186,37 +256,75 @@ void FluidBox::Advect(int b, float* d, float* d0, float* velocX, float* velocY, 
     float ifloat, jfloat;
     int i, j;
 
-    for (j = 1, jfloat = 1; j < m_sizeY - 1; j++, jfloat++) {
-        for (i = 1, ifloat = 1; i < m_sizeX - 1; i++, ifloat++) {
-            tmp1 = dtx * velocX[Index(i, j)];
-            tmp2 = dty * velocY[Index(i, j)];
-            x = ifloat - tmp1;
-            y = jfloat - tmp2;
+    if (!m_isHorizontalLoop)
+    {
+        for (j = 1, jfloat = 1; j < m_sizeY - 1; j++, jfloat++) {
+            for (i = 1, ifloat = 1; i < m_sizeX - 1; i++, ifloat++) {
+                tmp1 = dtx * velocX[Index(i, j)];
+                tmp2 = dty * velocY[Index(i, j)];
+                x = ifloat - tmp1;
+                y = jfloat - tmp2;
 
-            if (x < 0.5f) x = 0.5f;
-            if (x > NfloatX + 0.5f) x = NfloatX + 0.5f;
-            i0 = floorf(x);
-            i1 = i0 + 1.0f;
-            if (y < 0.5f) y = 0.5f;
-            if (y > NfloatY + 0.5f) y = NfloatY + 0.5f;
-            j0 = floorf(y);
-            j1 = j0 + 1.0f;
+                if (x < 0.5f) x = 0.5f;
+                if (x > NfloatX + 0.5f) x = NfloatX + 0.5f;
+                i0 = floorf(x);
+                i1 = i0 + 1.0f;
+                if (y < 0.5f) y = 0.5f;
+                if (y > NfloatY + 0.5f) y = NfloatY + 0.5f;
+                j0 = floorf(y);
+                j1 = j0 + 1.0f;
 
-            s1 = x - i0;
-            s0 = 1.0f - s1;
-            t1 = y - j0;
-            t0 = 1.0f - t1;
+                s1 = x - i0;
+                s0 = 1.0f - s1;
+                t1 = y - j0;
+                t0 = 1.0f - t1;
 
-            int i0i = (int)i0;
-            int i1i = (int)i1;
-            int j0i = (int)j0;
-            int j1i = (int)j1;
+                int i0i = (int)i0;
+                int i1i = (int)i1;
+                int j0i = (int)j0;
+                int j1i = (int)j1;
 
-            d[Index(i, j)] =
-                s0 * (t0 * d0[Index(i0i, j0i)] + t1 * d0[Index(i0i, j1i)])
-                + s1 * (t0 * d0[Index(i1i, j0i)] + t1 * d0[Index(i1i, j1i)]);
+                d[Index(i, j)] =
+                    s0 * (t0 * d0[Index(i0i, j0i)] + t1 * d0[Index(i0i, j1i)])
+                    + s1 * (t0 * d0[Index(i1i, j0i)] + t1 * d0[Index(i1i, j1i)]);
+            }
         }
     }
+    else
+    {
+        for (j = 1, jfloat = 1; j < m_sizeY - 1; j++, jfloat++) {
+            for (i = 0, ifloat = 0; i < m_sizeX; i++, ifloat++) {
+                tmp1 = dtx * velocX[Index(i, j)];
+                tmp2 = dty * velocY[Index(i, j)];
+                x = ifloat - tmp1;
+                y = jfloat - tmp2;
+
+                //if (x < 0.5f) x = 0.5f;
+                //if (x > NfloatX + 0.5f) x = NfloatX + 0.5f;
+                i0 = floorf(x);
+                i1 = i0 + 1.0f;
+                if (y < 0.5f) y = 0.5f;
+                if (y > NfloatY + 0.5f) y = NfloatY + 0.5f;
+                j0 = floorf(y);
+                j1 = j0 + 1.0f;
+
+                s1 = x - i0;
+                s0 = 1.0f - s1;
+                t1 = y - j0;
+                t0 = 1.0f - t1;
+
+                int i0i = (int)i0;
+                int i1i = (int)i1;
+                int j0i = (int)j0;
+                int j1i = (int)j1;
+
+                d[Index(i, j)] =
+                    s0 * (t0 * d0[IndexLoop(i0i, j0i)] + t1 * d0[IndexLoop(i0i, j1i)])
+                    + s1 * (t0 * d0[IndexLoop(i1i, j0i)] + t1 * d0[IndexLoop(i1i, j1i)]);
+            }
+        }
+    }
+
     SetBound(b, d);
 }
 
