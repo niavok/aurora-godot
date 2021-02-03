@@ -6,7 +6,7 @@ namespace godot {
 
 class FluidBox {
 public:
-    FluidBox(int sizeX, int sizeY, bool isHorizontalLoop);
+    FluidBox(int blockCountX, int blockCountY, float blockSize,  bool isHorizontalLoop);
     ~FluidBox();
 
     void AddDensity(int x, int y, float amount, int color);
@@ -22,8 +22,9 @@ public:
     float* Vx;
     float* Vy;
 
-    int m_sizeX;
-    int m_sizeY;
+    int m_blockCountX;
+    int m_blockCountY;
+    float m_blockSize;
 
 private:
     
@@ -38,7 +39,7 @@ private:
     bool m_isHorizontalLoop;
     float* s[3];
 
-    int m_sizeXMask;
+    int m_blockCountXMask;
   
 
     float* Vx0;

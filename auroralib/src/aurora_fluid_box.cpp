@@ -6,34 +6,35 @@
 namespace godot
 {
 
-FluidBox::FluidBox(int sizeX, int sizeY, bool isHorizontalLoop)
-    : m_sizeX(sizeX)
-    , m_sizeY(sizeY)
-    , m_linearSolveIter(10)
+FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHorizontalLoop)
+    : m_blockCountX(blockCountX)
+    , m_blockCountY(blockCountY)
+    , m_blockSize(blockSize)
+    , m_linearSolveIter(50)
     , m_isHorizontalLoop(isHorizontalLoop)
 {
     if(isHorizontalLoop)
     {
         assert((sizeX & (sizeX - 1)) == 0); // Ensure sizeX is power of 2 if loop
-        m_sizeXMask = m_sizeX - 1;
+        m_blockCountXMask = m_blockCountX - 1;
     }
 
-    int area = m_sizeX * m_sizeY;
+    int totalBlockCount = m_blockCountX * m_blockCountY;
 
     for (int i = 0; i < 3; i++)
     {
-        s[i] = new float[area];
-        density[i] = new float[area];
+        s[i] = new float[totalBlockCount];
+        density[i] = new float[totalBlockCount];
     }
 
-    Vx = new float[area];
-    Vy = new float[area];
+    Vx = new float[totalBlockCount];
+    Vy = new float[totalBlockCount];
 
-    Vx0 = new float[area];
-    Vy0 = new float[area];
+    Vx0 = new float[totalBlockCount];
+    Vy0 = new float[totalBlockCount];
 
 
-    for (int i = 0; i < area; i++)
+    for (int i = 0; i < totalBlockCount; i++)
     {
         for (int j = 0; j < 3; j++)
         {
@@ -66,12 +67,12 @@ FluidBox::~FluidBox()
 
 int FluidBox::Index(int x, int y)
 {
-	return x + y * m_sizeX;
+	return x + y * m_blockCountX;
 }
 
 int FluidBox::IndexLoop(int x, int y)
 {
-    return (x & m_sizeXMask) + y * m_sizeX;
+    return (x & m_blockCountXMask) + y * m_blockCountX;
 }
 
 void FluidBox::AddDensity(int x, int y, float amount, int color)
@@ -94,28 +95,28 @@ void FluidBox::SetBound(int b, float* x)
 {
     if (m_isHorizontalLoop)
     {
-        for (int i = 0; i < m_sizeX; i++) {
+        for (int i = 0; i < m_blockCountX; i++) {
             x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
-            x[Index(i, m_sizeY - 1)] = b == 2 ? -x[Index(i, m_sizeY - 2)] : x[Index(i, m_sizeY - 2)];
+            x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
         }
     }
     else
     {
-        for (int i = 1; i < m_sizeX - 1; i++) {
+        for (int i = 1; i < m_blockCountX - 1; i++) {
             x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
-            x[Index(i, m_sizeY - 1)] = b == 2 ? -x[Index(i, m_sizeY - 2)] : x[Index(i, m_sizeY - 2)];
+            x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
         }
     
-        for (int j = 1; j < m_sizeY - 1; j++) {
+        for (int j = 1; j < m_blockCountY - 1; j++) {
             x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
-            x[Index(m_sizeX - 1, j)] = b == 1 ? -x[Index(m_sizeX - 2, j)] : x[Index(m_sizeX - 2, j)];
+            x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
         }
 
 
         x[Index(0, 0)] = 0.5f * (x[Index(1, 0)] + x[Index(0, 1)]);
-        x[Index(0, m_sizeY - 1)] = 0.5f * (x[Index(1, m_sizeY - 1)] + x[Index(0, m_sizeY - 2)]);
-        x[Index(m_sizeX - 1, 0)] = 0.5f * (x[Index(m_sizeX - 2, 0)] + x[Index(m_sizeX - 1, 1)]);
-        x[Index(m_sizeX - 1, m_sizeY - 1)] = 0.5f * (x[Index(m_sizeX - 2, m_sizeY - 1)] + x[Index(m_sizeX - 1, m_sizeY - 2)]);
+        x[Index(0, m_blockCountY - 1)] = 0.5f * (x[Index(1, m_blockCountY - 1)] + x[Index(0, m_blockCountY - 2)]);
+        x[Index(m_blockCountX - 1, 0)] = 0.5f * (x[Index(m_blockCountX - 2, 0)] + x[Index(m_blockCountX - 1, 1)]);
+        x[Index(m_blockCountX - 1, m_blockCountY - 1)] = 0.5f * (x[Index(m_blockCountX - 2, m_blockCountY - 1)] + x[Index(m_blockCountX - 1, m_blockCountY - 2)]);
     }
 }
 
@@ -126,8 +127,8 @@ void FluidBox::LinearSolve(int b, float* x, float* x0, float a, float c)
     if (m_isHorizontalLoop)
     {
         for (int k = 0; k < m_linearSolveIter; k++) {
-            for (int j = 1; j < m_sizeY - 1; j++) {
-                for (int i = 0; i < m_sizeX; i++) {
+            for (int j = 1; j < m_blockCountY - 1; j++) {
+                for (int i = 0; i < m_blockCountX; i++) {
                     x[Index(i, j)] =
                         (x0[Index(i, j)]
                             + a * (x[IndexLoop(i + 1, j)] + x[IndexLoop(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
@@ -141,8 +142,8 @@ void FluidBox::LinearSolve(int b, float* x, float* x0, float a, float c)
     else
     {
         for (int k = 0; k < m_linearSolveIter; k++) {
-            for (int j = 1; j < m_sizeY - 1; j++) {
-                for (int i = 1; i < m_sizeX - 1; i++) {
+            for (int j = 1; j < m_blockCountY - 1; j++) {
+                for (int i = 1; i < m_blockCountX - 1; i++) {
                     x[Index(i, j)] =
                         (x0[Index(i, j)]
                             + a * (x[Index(i + 1, j)] + x[Index(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
@@ -178,7 +179,8 @@ void FluidBox::Step(float dt, float diff, float visc)
 
 void FluidBox::Diffuse(int b, float* x, float* x0, float diff, float dt)
 {
-    float a = dt * diff * (m_sizeX - 2) * (m_sizeY - 2);
+    //float a = dt * diff * (m_blockCountX - 2) * (m_blockCountY - 2);
+    float a = dt * diff / m_blockSize /** m_blockSize*/;
     LinearSolve(b, x, x0, a, 1 + 4 * a);
 }
 
@@ -188,8 +190,8 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
 
     if (!m_isHorizontalLoop)
     {
-        for (int j = 1; j < m_sizeY - 1; j++) {
-            for (int i = 1; i < m_sizeX - 1; i++) {
+        for (int j = 1; j < m_blockCountY - 1; j++) {
+            for (int i = 1; i < m_blockCountX - 1; i++) {
                 div[Index(i, j)] = -0.5f * (
                     velocX[Index(i + 1, j)]
                     - velocX[Index(i - 1, j)]
@@ -204,8 +206,8 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
         SetBound(0, p);
         LinearSolve(0, p, div, 1, 4);
 
-        for (int j = 1; j < m_sizeY - 1; j++) {
-            for (int i = 1; i < m_sizeX - 1; i++) {
+        for (int j = 1; j < m_blockCountY - 1; j++) {
+            for (int i = 1; i < m_blockCountX - 1; i++) {
                 velocX[Index(i, j)] -= 0.5f * (p[Index(i + 1, j)] - p[Index(i - 1, j)]);
                 velocY[Index(i, j)] -= 0.5f * (p[Index(i, j + 1)] - p[Index(i, j - 1)]);
             }
@@ -213,8 +215,8 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
     }
     else
     {
-        for (int j = 1; j < m_sizeY - 1; j++) {
-            for (int i = 0; i < m_sizeX; i++) {
+        for (int j = 1; j < m_blockCountY - 1; j++) {
+            for (int i = 0; i < m_blockCountX; i++) {
                 div[Index(i, j)] = -0.5f * (
                     velocX[IndexLoop(i + 1, j)]
                     - velocX[IndexLoop(i - 1, j)]
@@ -229,8 +231,8 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
         SetBound(0, p);
         LinearSolve(0, p, div, 1, 4);
 
-        for (int j = 1; j < m_sizeY - 1; j++) {
-            for (int i = 0; i < m_sizeX; i++) {
+        for (int j = 1; j < m_blockCountY - 1; j++) {
+            for (int i = 0; i < m_blockCountX; i++) {
                 velocX[Index(i, j)] -= 0.5f * (p[IndexLoop(i + 1, j)] - p[IndexLoop(i - 1, j)]);
                 velocY[Index(i, j)] -= 0.5f * (p[Index(i, j + 1)] - p[Index(i, j - 1)]);
             }
@@ -245,21 +247,21 @@ void FluidBox::Advect(int b, float* d, float* d0, float* velocX, float* velocY, 
 {
     float i0, i1, j0, j1;
 
-    float dtx = dt * (m_sizeX - 2);
-    float dty = dt * (m_sizeX - 2);
+    float dtx = dt;
+    float dty = dt;
 
     float s0, s1, t0, t1;
     float tmp1, tmp2, x, y;
 
-    float NfloatX = float(m_sizeX);
-    float NfloatY = float(m_sizeY);
+    float NfloatX = float(m_blockCountX);
+    float NfloatY = float(m_blockCountY);
     float ifloat, jfloat;
     int i, j;
 
     if (!m_isHorizontalLoop)
     {
-        for (j = 1, jfloat = 1; j < m_sizeY - 1; j++, jfloat++) {
-            for (i = 1, ifloat = 1; i < m_sizeX - 1; i++, ifloat++) {
+        for (j = 1, jfloat = 1; j < m_blockCountY - 1; j++, jfloat++) {
+            for (i = 1, ifloat = 1; i < m_blockCountX - 1; i++, ifloat++) {
                 tmp1 = dtx * velocX[Index(i, j)];
                 tmp2 = dty * velocY[Index(i, j)];
                 x = ifloat - tmp1;
@@ -292,8 +294,8 @@ void FluidBox::Advect(int b, float* d, float* d0, float* velocX, float* velocY, 
     }
     else
     {
-        for (j = 1, jfloat = 1; j < m_sizeY - 1; j++, jfloat++) {
-            for (i = 0, ifloat = 0; i < m_sizeX; i++, ifloat++) {
+        for (j = 1, jfloat = 1; j < m_blockCountY - 1; j++, jfloat++) {
+            for (i = 0, ifloat = 0; i < m_blockCountX; i++, ifloat++) {
                 tmp1 = dtx * velocX[Index(i, j)];
                 tmp2 = dty * velocY[Index(i, j)];
                 x = ifloat - tmp1;

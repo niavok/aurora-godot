@@ -23,10 +23,12 @@ data_*/
 auroralib/.sconsign.dblite
 bin/win64
 *.obj
+*.obj.enc
 *.idb
 *.pdb
 auroralib/.vs
 auroralib/x64
-*.vsxproj
-*.vsxproj.filters
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
 *.sln
