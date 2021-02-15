@@ -3,33 +3,51 @@
 #include <math.h>
 #include <cassert>
 
+#define DEBUG_PROFILIN_LOG 1
+
+#if DEBUG_PROFILIN_LOG
+#include <chrono>
+#endif
+
+
 namespace godot
 {
 
 FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHorizontalLoop)
-    : m_blockCountX(blockCountX)
+    : m_blockCountXMask(0)
+    , m_blockCountX(blockCountX)
     , m_blockCountY(blockCountY)
     , m_blockSize(blockSize)
     , m_diffuseMaxIter(100)
     , m_viscosityMaxIter(100)
-    , m_projectMaxIter(200)
-    , m_diffuseQualityThresold(1e-5)
-    , m_viscosityQualityThresold(1e-5)
-    , m_projectQualityThresold(0.1f)
+    , m_projectMaxIter(2000)
+    , m_diffuseQualityThresold(1e-5f)
+    , m_viscosityQualityThresold(1e-5f)
+    , m_projectQualityThresold(0.001f)
     , m_isHorizontalLoop(isHorizontalLoop)
 {
-    if(isHorizontalLoop)
+    m_blockCount = m_blockCountX * m_blockCountY;
+
+    if (isHorizontalLoop)
     {
         assert((m_blockCountX & (m_blockCountX - 1)) == 0); // Ensure sizeX is power of 2 if loop
         m_blockCountXMask = m_blockCountX - 1;
+
+        m_blockCountXWithBounds = m_blockCountX;
+    }
+    else
+    {
+        m_blockCountXWithBounds = m_blockCountX + 2;
     }
 
-    m_blockCount = m_blockCountX * m_blockCountY;
+    m_blockCountYWithBounds = m_blockCountY + 2;
+    m_blockCountWithBounds = m_blockCountXWithBounds * m_blockCountYWithBounds;
+
 
     for (int i = 0; i < 3; i++)
     {
-        s[i] = new float[m_blockCount];
-        density[i] = new float[m_blockCount];
+        tempDensity[i] = new float[m_blockCountWithBounds];
+        density[i] = new float[m_blockCountWithBounds];
     }
 
     Vx = new float[m_blockCount];
@@ -40,13 +58,18 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
     p1 = new float[m_blockCount];
     p2 = new float[m_blockCount];
+    divBuffer = new float[m_blockCount];
+
+    blockEdgeType = new uint8_t[m_blockCount];
+    velocityXType = new uint8_t[m_blockCount];
+    velocityYType = new uint8_t[m_blockCount];
 
 
     for (int i = 0; i < m_blockCount; i++)
     {
         for (int j = 0; j < 3; j++)
         {
-            s[j][i] = 0.f;
+            tempDensity[j][i] = 0.f;
             density[j][i] = 0.f;
         }
 
@@ -58,6 +81,11 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
         p1[i] = 0.f;
         p2[i] = 0.f;
+
+        blockEdgeType[i] = BlockEdge_VOID;
+        velocityXType[i] = Velocity_FREE;
+        velocityYType[i] = Velocity_FREE;
+        divBuffer[i] = 0;
     }
 }
 
@@ -65,7 +93,7 @@ FluidBox::~FluidBox()
 {
     for (int i = 0; i < 3; i++)
     {
-        delete[] s[i];
+        delete[] tempDensity[i];
         delete[] density[i];
     }
 
@@ -74,11 +102,17 @@ FluidBox::~FluidBox()
 
     delete[] Vx0;
     delete[] Vy0;
+
+    delete[] p1;
+    delete[] p2;
+    delete[] divBuffer;
+
+    delete[] blockEdgeType;
 }
 
 int FluidBox::Index(int x, int y)
 {
-	return x + y * m_blockCountX;
+    return x + y * m_blockCountX;
 }
 
 int FluidBox::IndexLoop(int x, int y)
@@ -89,7 +123,7 @@ int FluidBox::IndexLoop(int x, int y)
 void FluidBox::AddDensity(int x, int y, float amount, int color)
 {
     density[color][Index(x, y)] += amount;
-    s[color][Index(x, y)] += amount;
+    tempDensity[color][Index(x, y)] += amount;
 }
 
 void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
@@ -102,14 +136,43 @@ void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
     Vy0[index] += amountY;
 }
 
+void FluidBox::SetVelocity(int x, int y, float amountX, float amountY)
+{
+    int index = Index(x, y);
+
+    Vx[index] = amountX;
+    Vy[index] = amountY;
+    Vx0[index] = amountX;
+    Vy0[index] = amountY;
+}
+
+
 void FluidBox::SetBound(int b, float* x)
 {
     if (m_isHorizontalLoop)
     {
         for (int i = 0; i < m_blockCountX; i++) {
-            x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
-            x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
+            //x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
+            //x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
+            //x[Index(i, 0)] = b == 2 ? 0 : x[Index(i, 1)];
+            //x[Index(i, m_blockCountY - 1)] = b == 2 ? 0 : x[Index(i, m_blockCountY - 2)];
+
+            x[Index(i, 0)] = b == 0 ? x[Index(i, 1)] : 0;
+            x[Index(i, m_blockCountY - 1)] = b == 0 ? x[Index(i, m_blockCountY - 2)] : 0;
+
+            //x[Index(i, 0)] = 0;
+            //x[Index(i, m_blockCountY-1)] = 0;
         }
+
+        //for (int j = 30; j < 90; j++)
+        //{
+        //    int i = 100;
+
+        //    //x[Index(i, j)] = b == 0 ? x[Index(i-1, j)] + x[Index(i+1, j)] + x[Index(i, j-1)] + x[Index(i, j+1)] : 0;
+        //    x[Index(i, j)] = b == 0 ? x[Index(i - 1, j)] : 0;
+        //    x[Index(i+1, j)] = b == 0 ? x[Index(i+2, j)] : 0;
+        //}
+
     }
     else
     {
@@ -117,7 +180,7 @@ void FluidBox::SetBound(int b, float* x)
             x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
             x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
         }
-    
+
         for (int j = 1; j < m_blockCountY - 1; j++) {
             x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
             x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
@@ -143,22 +206,50 @@ int FluidBox::LinearSolve(int b, float* x, float* x0, float a, float c, int maxI
             float maxCorrection = 0;
             for (int j = 1; j < m_blockCountY - 1; j++) {
                 for (int i = 0; i < m_blockCountX; i++) {
-                    float newX = (x0[Index(i, j)]
-                        + a * (x[IndexLoop(i + 1, j)] + x[IndexLoop(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
-                        ) * cRecip;
-                    float correction = abs(newX - x[Index(i, j)]);
-                    if (maxCorrection < correction)
+
+                    uint8_t type = blockEdgeType[Index(i, j)];
+                    if (type != 0)
                     {
-                        maxCorrection = correction;
+                        //x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
+                        //x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
+
+                        if (type == 1)
+                        {
+                            // Left border
+                            //x[Index(i, j)] = x[Index(i-1, j)];
+                            x[Index(i, j)] = b == 1 ? -x[Index(i - 1, j)] : x[Index(i - 1, j)];
+                        }
+                        else if (type == 2)
+                        {
+                            x[Index(i, j)] = b == 1 ? -x[Index(i + 1, j)] : x[Index(i + 1, j)];
+                            //x[Index(i, j)] = -x[Index(i + 1, j)];
+                        }
+
+
+                        //x[Index(i, j)] = 0;
+                        /*if(b==0)
+                        x[Index(i, 0)] = b == 0 ? x[Index(i, 1)] : 0;
+                        x[Index(i, m_blockCountY - 1)] = b == 0 ? x[Index(i, m_blockCountY - 2)] : 0;*/
                     }
-                    x[Index(i, j)] = newX;
-                        
+                    else
+                    {
+
+                        float newX = (x0[Index(i, j)]
+                            + a * (x[IndexLoop(i + 1, j)] + x[IndexLoop(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
+                            ) * cRecip;
+                        float correction = abs(newX - x[Index(i, j)]);
+                        if (maxCorrection < correction)
+                        {
+                            maxCorrection = correction;
+                        }
+                        x[Index(i, j)] = newX;
+                    }
                 }
             }
 
             SetBound(b, x);
 
-            if(maxCorrection <= qualityThresold)
+            if (maxCorrection <= qualityThresold)
             {
                 break;
             }
@@ -200,24 +291,33 @@ void FluidBox::Step(float dt, float diff, float visc)
 {
     memcpy(Vx0, Vx, sizeof(float) * m_blockCount);
     memcpy(Vy0, Vy, sizeof(float) * m_blockCount);
-    Diffuse(1, Vx0, Vx, visc, dt, m_viscosityMaxIter, m_diffuseQualityThresold);
-    Diffuse(2, Vy0, Vy, visc, dt, m_viscosityMaxIter, m_diffuseQualityThresold);
+#if 0
+    Diffuse(1, Vx0, Vx, visc, dt, m_viscosityMaxIter, m_viscosityQualityThresold);
+    Diffuse(2, Vy0, Vy, visc, dt, m_viscosityMaxIter, m_viscosityQualityThresold);
+#else
+    memcpy(Vx, Vx0, sizeof(float) * m_blockCount);
+    memcpy(Vy, Vy0, sizeof(float) * m_blockCount);
+#endif
 
-    Project(Vx0, Vy0, p1, Vy);
+#if 0
+    Project(Vx0, Vy0, p1, divBuffer);
     Advect(1, Vx, Vx0, Vx0, Vy0, dt);
     Advect(2, Vy, Vy0, Vx0, Vy0, dt);
+#endif
 
-    Project(Vx, Vy, p2, Vy0);
+    Project(Vx, Vy, p2, divBuffer);
 
+#if 0
     for (int i = 0; i < 3; i++)
     {
-        float* color_s = s[i];
+        float* color_s = tempDensity[i];
         float* color_density = density[i];
 
         memcpy(color_s, color_density, sizeof(float) * m_blockCount);
         Diffuse(0, color_s, color_density, diff, dt, m_diffuseMaxIter, m_diffuseQualityThresold);
         Advect(0, color_density, color_s, Vx, Vy, dt);
     }
+#endif
 }
 
 void FluidBox::Diffuse(int b, float* x, float* x0, float diff, float dt, int maxIter, float qualityThresold)
@@ -235,7 +335,7 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
     {
         for (int j = 1; j < m_blockCountY - 1; j++) {
             for (int i = 1; i < m_blockCountX - 1; i++) {
-                float localDiv = -0.5f * (
+                float localDiv = (
                     velocX[Index(i + 1, j)]
                     - velocX[Index(i - 1, j)]
                     + velocY[Index(i, j + 1)]
@@ -258,32 +358,201 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
     }
     else
     {
+        for (int blockIndex  = 0; blockIndex < m_blockCount; blockIndex++)
+        {
+            uint8_t type = blockEdgeType[blockIndex];
+            int i = blockIndex % m_blockCountX;
+            int j = blockIndex / m_blockCountX;
+
+            switch (type)
+            {
+            case BlockEdge_VOID:
+                assert(i > 0 && j > 0 && i < m_blockCountX-1 && j < m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
+                                + velocY[blockIndex + m_blockCountX] - velocY[blockIndex];
+                break;
+            case BlockEdge_HORIZONTAL_PIPE:
+                assert(i > 0 && i < m_blockCountX - 1);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex];
+                break;
+            case BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE:
+                assert(i == 0);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex];
+                break;
+            case BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE:
+                assert(i == m_blockCountX-1);
+                div[blockIndex] = velocX[blockIndex + 1 - m_blockCountX] - velocX[blockIndex];
+                break;
+            default:
+                assert(false); // Invalid block edge type
+            }
+        }
+
+        //SetBound(0, div);
+        //SetBound(0, p);
+        //LinearSolve(0, p, div, 1, 4, m_projectMaxIter, m_projectQualityThresold);
+        int k;
+        for (k = 0; k < m_projectMaxIter; k++)
+        {
+            float maxCorrection = 0;
+            for (int blockIndex = 0; blockIndex < m_blockCount; blockIndex++)
+            {
+                uint8_t type = blockEdgeType[blockIndex];
+                float newP;
+                switch (type)
+                {
+                case BlockEdge_VOID:
+                    newP = 0.25f * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1]
+                        + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_HORIZONTAL_PIPE:
+                    newP = 0.5f * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1]);
+                    break;
+                case BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE:
+                    newP = 0.5f * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]);
+                    break;
+                case BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE:
+                    newP = 0.5f * (div[blockIndex]
+                        + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]);
+                    break;
+                default:
+                    newP = 0;
+                    assert(false); // Invalid block edge type
+                }
+
+                float correction = abs(newP - p[blockIndex]);
+                if (maxCorrection < correction)
+                {
+                    maxCorrection = correction;
+                }
+                    
+                p[blockIndex] = newP;
+
+                //uint8_t type = blockType[Index(i, j)];
+                //if (type != 0 && false)
+                //{
+                //    //x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
+                //    //x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
+
+                //    if (type == 1)
+                //    {
+                //        // Left border
+                //        //x[Index(i, j)] = x[Index(i-1, j)];
+                //        p[Index(i, j)] = p[Index(i - 1, j)];
+                //    }
+                //    else if (type == 2)
+                //    {
+                //        p[Index(i, j)] = p[Index(i + 1, j)];
+                //        //x[Index(i, j)] = -x[Index(i + 1, j)];
+                //    }
+
+
+                //    //x[Index(i, j)] = 0;
+                //    /*if(b==0)
+                //    x[Index(i, 0)] = b == 0 ? x[Index(i, 1)] : 0;
+                //    x[Index(i, m_blockCountY - 1)] = b == 0 ? x[Index(i, m_blockCountY - 2)] : 0;*/
+                //}
+                //else
+                //{
+
+                //    //float newP = - 0.25 * (div[Index(i, j)] + p[IndexLoop(i + 1, j)] + p[IndexLoop(i - 1, j)] + p[Index(i, j + 1)] + p[Index(i, j - 1)]);
+                //    float newP = 0.5 * (div[Index(i, j)] + p[IndexLoop(i + 1, j)] + p[IndexLoop(i - 1, j)]);
+                //    float correction = abs(newP - p[Index(i, j)]);
+                //    if (maxCorrection < correction)
+                //    {
+                //        maxCorrection = correction;
+                //    }
+                //    p[Index(i, j)] = newP;
+                //}
+                
+            }
+
+            //SetBound(0, p);
+
+            if (maxCorrection <= m_projectQualityThresold)
+            {
+                break;
+            }
+        }
+
+
+        //float minP = 1e9;
+        //float maxP = -1e9;
+        //for (int j = 0; j < m_blockCount; j++) {
+        //    float pValue = p[j];
+        //    minP = std::min(minP, pValue);
+        //    maxP = std::max(maxP, pValue);
+        //}
+
+        for (int blockIndex = 0; blockIndex < m_blockCount; blockIndex++)
+        {
+            uint8_t vxType = velocityXType[blockIndex];
+            switch (vxType)
+            {
+            case Velocity_ZERO:
+                velocX[blockIndex] = 0;
+                break;
+            case Velocity_FREE:
+            case Velocity_LOOPING_RIGHT:
+                velocX[blockIndex] += p[blockIndex] - p[blockIndex - 1];
+                break;
+            case Velocity_LOOPING_LEFT:
+                velocX[blockIndex] += p[blockIndex] - p[blockIndex - 1 + m_blockCountX];
+                break;
+            default:
+                assert(false); // invalid velocity type
+            }
+
+            uint8_t vyType = velocityYType[blockIndex];
+            switch (vyType)
+            {
+            case Velocity_ZERO:
+                velocY[blockIndex] = 0;
+                break;
+            case Velocity_FREE:
+                velocY[blockIndex] += p[blockIndex] - p[blockIndex - m_blockCountX];
+                break;
+            default:
+                assert(false); // invalid velocity type
+            }
+        }
+
+        //for (int j = 1; j < m_blockCountY - 1; j++) {
+        //    for (int i = 0; i < m_blockCountX; i++) {
+        //        uint8_t type = blockEdgeType[blockIndex];
+        //        switch (type)
+        //        {
+        //        case BlockEdge_VOID:
+        //            velocX[blockIndex] += p[blockIndex] - p[blockIndex - 1];
+        //            velocY[blockIndex] += p[blockIndex] - p[blockIndex - m_blockCountX];
+        //            break;
+        //        default:
+        //            assert(false); // Invalid block edge type
+        //        }
+        //    }
+        //}
+
+      /*  float minDiv2 = 1e9;
+        float maxDiv2 = -1e9;
         for (int j = 1; j < m_blockCountY - 1; j++) {
             for (int i = 0; i < m_blockCountX; i++) {
                 float localDiv = -0.5f * (
                     velocX[IndexLoop(i + 1, j)]
-                    - velocX[IndexLoop(i - 1, j)]
-                    + velocY[Index(i, j + 1)]
-                    - velocY[Index(i, j - 1)]
+                    - velocX[IndexLoop(i, j)]
                     );
-                div[Index(i, j)] = localDiv;
+                minDiv2 = std::min(minDiv2, localDiv);
+                maxDiv2 = std::max(maxDiv2, localDiv);
             }
         }
-
-        SetBound(0, div);
-        SetBound(0, p);
-        LinearSolve(0, p, div, 1, 4, m_projectMaxIter, m_projectQualityThresold);
-
-        for (int j = 1; j < m_blockCountY - 1; j++) {
-            for (int i = 0; i < m_blockCountX; i++) {
-                velocX[Index(i, j)] -= 0.5f * (p[IndexLoop(i + 1, j)] - p[IndexLoop(i - 1, j)]);
-                velocY[Index(i, j)] -= 0.5f * (p[Index(i, j + 1)] - p[Index(i, j - 1)]);
-            }
-        }
+        float plop = 3;*/
     }
 
-    SetBound(1, velocX);
-    SetBound(2, velocY);
+    //SetBound(1, velocX);
+    //SetBound(2, velocY);
 }
 
 void FluidBox::Advect(int b, float* d, float* d0, float* velocX, float* velocY, float dt)
@@ -373,6 +642,20 @@ void FluidBox::Advect(int b, float* d, float* d0, float* velocX, float* velocY, 
     SetBound(b, d);
 }
 
+void FluidBox::DecayDensity(float keepRatio)
+{
+    for (int color = 0; color < 3; color++)
+    {
+        float* d = density[color];
+        float* tempsD = tempDensity[color];
+
+        for (int i = 0; i < m_blockCount; i++)
+        {
+            d[i] *= keepRatio;
+            tempsD[i] *= keepRatio;
+        }
+    }
+}
 
 
 }

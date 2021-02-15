@@ -104,11 +104,10 @@ position = Vector2( -2740.18, -247.391 )
 script = ExtResource( 4 )
 diffusion_coef = 0.001
 viscosity_coef = 10.0
-RENDER_DEBUG_SCALE = 5.0
-WORLD_BLOCK_SIZE = 1.0
+RENDER_DEBUG_SCALE = 10.0
 RENDER_DEBUG_VELOCITY_SCALE = 0.1
 m_worldStepDt = 0.05
-RENDER_DEBUG_DENSITY = 0.2
+RENDER_DEBUG_DENSITY = 0.01
 
 [node name="Background" type="CanvasLayer" parent="."]
 layer = -2

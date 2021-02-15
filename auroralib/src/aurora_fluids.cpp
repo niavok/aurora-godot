@@ -25,6 +25,49 @@ void Fluids::_register_methods() {
 Fluids::Fluids()
 {
     m_fluidBox = new FluidBox(512, 100, 150, true); // 51.2 km * 15 km
+
+    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+    {
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(0, j)] = FluidBox::BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE;
+        for (int i = 1; i < m_fluidBox->m_blockCountX - 1; i++)
+        {
+            m_fluidBox->blockEdgeType[m_fluidBox->Index(i, j)] = FluidBox::BlockEdge_HORIZONTAL_PIPE;
+        }
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, j)] = FluidBox::BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE;
+    }
+
+    for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
+    {
+        m_fluidBox->velocityYType[m_fluidBox->Index(i, 0)] = FluidBox::Velocity_ZERO;
+        m_fluidBox->velocityYType[m_fluidBox->Index(i, m_fluidBox->m_blockCountY-1)] = FluidBox::Velocity_ZERO;
+    }
+
+    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+    {
+        m_fluidBox->velocityXType[m_fluidBox->Index(0, j)] = FluidBox::Velocity_LOOPING_LEFT;
+        m_fluidBox->velocityXType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, j)] = FluidBox::Velocity_LOOPING_RIGHT;
+    }
+    
+
+    //for (int j = 30; j < 90; j++)
+    //{
+    //    m_fluidBox->blockType[m_fluidBox->Index(100, j)] = 1;
+    //    m_fluidBox->blockType[m_fluidBox->Index(101, j)] = 2;
+    //}
+
+
+    //for (int j = 0; j < 40; j++)
+    //{
+    //    m_fluidBox->blockType[m_fluidBox->Index(250, j)] = 1;
+    //    m_fluidBox->blockType[m_fluidBox->Index(251, j)] = 2;
+    //}
+
+    //for (int j = 60; j < 100; j++)
+    //{
+    //    m_fluidBox->blockType[m_fluidBox->Index(250, j)] = 1;
+    //    m_fluidBox->blockType[m_fluidBox->Index(251, j)] = 2;
+    //}
+
 }
 
 Fluids::~Fluids() {
@@ -123,6 +166,11 @@ void Fluids::StepWorld(float dt)
 
     if (m_worldEnableSun)
     {
+        for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+        {
+            m_fluidBox->SetVelocity(7, j, 100.f, 0);
+        }
+
         for (int j = 0; j < 20; j++)
         {
             for (int i = 0; i < 10; i++)
@@ -133,7 +181,7 @@ void Fluids::StepWorld(float dt)
 
 
                 float vel = 200.f * dt;
-                m_fluidBox->AddVelocity(50 + i, 50 + j, direction.x * vel, direction.y * vel);
+                //m_fluidBox->AddVelocity(50 + i, 50 + j, direction.x * vel, direction.y * vel);
 
 
 
@@ -152,7 +200,7 @@ void Fluids::StepWorld(float dt)
                 //directionB.set_rotation(totalDuration * 5);
                 float velB = 100.f * dt;
 
-                m_fluidBox->AddVelocity(150 + i, 40 + j, directionB.x * velB, directionB.y * velB);
+                //m_fluidBox->AddVelocity(150 + i, 40 + j, directionB.x * velB, directionB.y * velB);
 
             }
         }
@@ -167,6 +215,9 @@ void Fluids::StepWorld(float dt)
             }
         }
     }
+
+    m_fluidBox->DecayDensity(0.99f);
+
 
     m_fluidBox->Step(dt, diffusion_coef /** 0.00001f*/, viscosity_coef /** 0.00001f*/);
 }
@@ -190,14 +241,40 @@ void Fluids::_draw()
     //Vector2 RENDER_DEBUG_OFFSET(offetX, offetY);
     if (true)
     {
-        for (int j = 0; j < m_fluidBox->m_blockCountY; j += 2)
+        for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
         {
-            for (int i = 0; i < m_fluidBox->m_blockCountX; i += 2)
+            for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
+            {
+                Vector2 position((real_t)i, (real_t)j);
+                int index = m_fluidBox->Index(i, j);
+
+                uint8_t type = m_fluidBox->blockEdgeType[index];
+                if (type != FluidBox::BlockEdge_FILL)
+                {
+                    if (type == FluidBox::BlockEdge_LEFT_EDGE)
+                    {
+                        draw_line(RENDER_DEBUG_OFFSET + position * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + (position + Vector2(0, WORLD_BLOCK_SIZE)) * RENDER_DEBUG_SCALE, Color(1.f, 1.f, 1.0f), 1);
+                    }
+                    else if (type == FluidBox::BlockEdge_RIGHT_EDGE)
+                    {
+                        draw_line(RENDER_DEBUG_OFFSET + (position + Vector2(WORLD_BLOCK_SIZE, 0)) * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + (position + Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE)) * RENDER_DEBUG_SCALE, Color(1.f, 1.f, 1.0f), 1);
+                    }
+                }
+            }
+        }
+
+
+        for (int j = 0; j < m_fluidBox->m_blockCountY; j += 1)
+        {
+            for (int i = 0; i < m_fluidBox->m_blockCountX; i += 1)
             {
                 //Color tileColor(0.f, m_fluidBox->density[Index(i, j)] / 100.f, 0.f);
                 //Color tileColor(m_fluidBox->Vx[Index(i, j)] / 10.f, m_fluidBox->density[Index(i, j)] / 100.f, m_fluidBox->Vy[Index(i, j)] / 10.f);
                 //
-                Vector2 velocity(m_fluidBox->Vx[m_fluidBox->Index(i, j)], m_fluidBox->Vy[m_fluidBox->Index(i, j)]);
+
+                int index = m_fluidBox->Index(i, j);
+
+                Vector2 velocity(m_fluidBox->Vx[index], m_fluidBox->Vy[index]);
 
                 if (velocity.length_squared() < 1e-5)
                 {
@@ -221,8 +298,7 @@ void Fluids::_draw()
                 Vector2 center_pos = position + Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE) * 0.5f;
                 Vector2 velocity_pos = center_pos + velocity * RENDER_DEBUG_VELOCITY_SCALE;
 
-
-
+         
 
 
 
@@ -243,7 +319,30 @@ void Fluids::_draw()
     //float offetY = 0;
 
 
-    float opacityCoeff = RENDER_DEBUG_DENSITY / (30 + totalDuration);
+    float opacityCoeff = RENDER_DEBUG_DENSITY;
+
+
+    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+    {
+        for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
+        {
+            Vector2 position((real_t)i, (real_t)j);
+            int index = m_fluidBox->Index(i, j);
+
+            uint8_t type = m_fluidBox->blockEdgeType[index];
+            if (type != 0)
+            {
+                if (type == 1)
+                {
+                    draw_line(RENDER_DEBUG_OFFSET + position * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + (position + Vector2(0, WORLD_BLOCK_SIZE)) * RENDER_DEBUG_SCALE, Color(1.f, 1.f, 1.0f), 1);
+                }
+                else if (type == 2)
+                {
+                    draw_line(RENDER_DEBUG_OFFSET + (position + Vector2(WORLD_BLOCK_SIZE, 0)) * RENDER_DEBUG_SCALE, RENDER_DEBUG_OFFSET + (position + Vector2(WORLD_BLOCK_SIZE, WORLD_BLOCK_SIZE)) * RENDER_DEBUG_SCALE, Color(1.f, 1.f, 1.0f), 1);
+                }
+            }
+        }
+    }
 
     for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
     {
