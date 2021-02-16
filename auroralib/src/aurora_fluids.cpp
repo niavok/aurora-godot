@@ -26,15 +26,32 @@ Fluids::Fluids()
 {
     m_fluidBox = new FluidBox(512, 100, 150, true); // 51.2 km * 15 km
 
-    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+    m_fluidBox->blockEdgeType[m_fluidBox->Index(0, 0)] = FluidBox::BlockEdge_LOOPING_TOP_LEFT_CORNER;
+    m_fluidBox->blockEdgeType[m_fluidBox->Index(m_fluidBox->m_blockCountX-1, 0)] = FluidBox::BlockEdge_LOOPING_TOP_RIGHT_CORNER;
+    m_fluidBox->blockEdgeType[m_fluidBox->Index(0, m_fluidBox->m_blockCountY-1)] = FluidBox::BlockEdge_LOOPING_BOTTOM_LEFT_CORNER;
+    m_fluidBox->blockEdgeType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, m_fluidBox->m_blockCountY-1)] = FluidBox::BlockEdge_LOOPING_BOTTOM_RIGHT_CORNER;
+
+    for (int j = 1; j < m_fluidBox->m_blockCountY-1; j++)
     {
-        m_fluidBox->blockEdgeType[m_fluidBox->Index(0, j)] = FluidBox::BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE;
-        for (int i = 1; i < m_fluidBox->m_blockCountX - 1; i++)
-        {
-            m_fluidBox->blockEdgeType[m_fluidBox->Index(i, j)] = FluidBox::BlockEdge_HORIZONTAL_PIPE;
-        }
-        m_fluidBox->blockEdgeType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, j)] = FluidBox::BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE;
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(0, j)] = FluidBox::BlockEdge_LOOPING_LEFT_EDGE;
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, j)] = FluidBox::BlockEdge_LOOPING_RIGHT_EDGE;
     }
+
+    for (int i = 1; i < m_fluidBox->m_blockCountX - 1; i++)
+    {
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(i, 0)] = FluidBox::BlockEdge_TOP_EDGE;
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(i, m_fluidBox->m_blockCountY - 1)] = FluidBox::BlockEdge_BOTTOM_EDGE;
+    }
+
+    //for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+    //{
+    //    m_fluidBox->blockEdgeType[m_fluidBox->Index(0, j)] = FluidBox::BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE;
+    //    for (int i = 1; i < m_fluidBox->m_blockCountX - 1; i++)
+    //    {
+    //        m_fluidBox->blockEdgeType[m_fluidBox->Index(i, j)] = FluidBox::BlockEdge_HORIZONTAL_PIPE;
+    //    }
+    //    m_fluidBox->blockEdgeType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, j)] = FluidBox::BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE;
+    //}
 
     for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
     {
@@ -48,6 +65,29 @@ Fluids::Fluids()
         m_fluidBox->velocityXType[m_fluidBox->Index(m_fluidBox->m_blockCountX - 1, j)] = FluidBox::Velocity_LOOPING_RIGHT;
     }
     
+
+    // Vertical sep
+    int sepX = 100;
+    int sepY0 = 15;
+    int sepY1 = 85;
+
+    m_fluidBox->blockEdgeType[m_fluidBox->Index(sepX+1, sepY0-1)] = FluidBox::BlockEdge_BOTTOM_EDGE;
+    m_fluidBox->blockEdgeType[m_fluidBox->Index(sepX + 1, sepY1)] = FluidBox::BlockEdge_TOP_EDGE;
+
+    m_fluidBox->velocityYType[m_fluidBox->Index(sepX + 1, sepY0)] = FluidBox::Velocity_ZERO;
+    m_fluidBox->velocityYType[m_fluidBox->Index(sepX + 1, sepY1)] = FluidBox::Velocity_ZERO;
+
+    for (int j = sepY0; j < sepY1; j++)
+    {
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(sepX, j)] = FluidBox::BlockEdge_RIGHT_EDGE;
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(sepX+1, j)] = FluidBox::BlockEdge_FILL;
+        m_fluidBox->blockEdgeType[m_fluidBox->Index(sepX+2, j)] = FluidBox::BlockEdge_LEFT_EDGE;
+
+        m_fluidBox->velocityXType[m_fluidBox->Index(sepX + 1, j)] = FluidBox::Velocity_ZERO;
+        m_fluidBox->velocityXType[m_fluidBox->Index(sepX + 2, j)] = FluidBox::Velocity_ZERO;
+    }
+
+
 
     //for (int j = 30; j < 90; j++)
     //{
@@ -166,9 +206,10 @@ void Fluids::StepWorld(float dt)
 
     if (m_worldEnableSun)
     {
-        for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+        for (int j = 0 + 20; j < m_fluidBox->m_blockCountY-20; j++)
+        //for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
         {
-            m_fluidBox->SetVelocity(7, j, 100.f, 0);
+            m_fluidBox->SetVelocity(50, j, 100.f, 0);
         }
 
         for (int j = 0; j < 20; j++)

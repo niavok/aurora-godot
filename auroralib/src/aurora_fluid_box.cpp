@@ -2,7 +2,7 @@
 
 #include <math.h>
 #include <cassert>
-
+#include <Math.hpp>
 #define DEBUG_PROFILIN_LOG 1
 
 #if DEBUG_PROFILIN_LOG
@@ -20,10 +20,10 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
     , m_blockSize(blockSize)
     , m_diffuseMaxIter(100)
     , m_viscosityMaxIter(100)
-    , m_projectMaxIter(2000)
+    , m_projectMaxIter(200)
     , m_diffuseQualityThresold(1e-5f)
     , m_viscosityQualityThresold(1e-5f)
-    , m_projectQualityThresold(0.001f)
+    , m_projectQualityThresold(0.01f)
     , m_isHorizontalLoop(isHorizontalLoop)
 {
     m_blockCount = m_blockCountX * m_blockCountY;
@@ -371,9 +371,62 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
                 div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
                                 + velocY[blockIndex + m_blockCountX] - velocY[blockIndex];
                 break;
+            case BlockEdge_FILL:
+                continue;
+                break;
+            case BlockEdge_TOP_EDGE:
+                assert(i > 0 && i < m_blockCountX - 1 && j < m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
+                    + velocY[blockIndex + m_blockCountX];
+                break;
+            case BlockEdge_BOTTOM_EDGE:
+                assert(i > 0 && j > 0 && i < m_blockCountX - 1);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
+                    - velocY[blockIndex];
+                break;
+            case BlockEdge_LEFT_EDGE:
+                assert(j > 0 && i < m_blockCountX - 1 && j < m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1]
+                    + velocY[blockIndex + m_blockCountX] - velocY[blockIndex];
+                break;
+            case BlockEdge_RIGHT_EDGE:
+                assert(i > 0 && j > 0 && j < m_blockCountY - 1);
+                div[blockIndex] = - velocX[blockIndex]
+                    + velocY[blockIndex + m_blockCountX] - velocY[blockIndex];
+                break;
             case BlockEdge_HORIZONTAL_PIPE:
                 assert(i > 0 && i < m_blockCountX - 1);
                 div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex];
+                break;
+            case BlockEdge_LOOPING_LEFT_EDGE:
+                assert(i == 0 && j > 0 && j < m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
+                    + velocY[blockIndex + m_blockCountX] - velocY[blockIndex];
+                break;
+            case BlockEdge_LOOPING_RIGHT_EDGE:
+                assert(i == m_blockCountX - 1 && j > 0 && j < m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1 - m_blockCountX] - velocX[blockIndex]
+                    + velocY[blockIndex + m_blockCountX] - velocY[blockIndex];
+                break;
+            case BlockEdge_LOOPING_TOP_LEFT_CORNER:
+                assert(i == 0 && j == 0);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
+                    + velocY[blockIndex + m_blockCountX];
+                break;
+            case BlockEdge_LOOPING_TOP_RIGHT_CORNER:
+                assert(i == m_blockCountX-1 && j == 0);
+                div[blockIndex] = velocX[blockIndex + 1 - m_blockCountX] - velocX[blockIndex]
+                    + velocY[blockIndex + m_blockCountX];
+                break;
+            case BlockEdge_LOOPING_BOTTOM_LEFT_CORNER:
+                assert(i == 0 && j == m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1] - velocX[blockIndex]
+                    - velocY[blockIndex];
+                break;
+            case BlockEdge_LOOPING_BOTTOM_RIGHT_CORNER:
+                assert(i == m_blockCountX - 1 && j == m_blockCountY - 1);
+                div[blockIndex] = velocX[blockIndex + 1 - m_blockCountX] - velocX[blockIndex]
+                    - velocY[blockIndex];
                 break;
             case BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE:
                 assert(i == 0);
@@ -407,9 +460,72 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
                         + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
                         );
                     break;
+                case BlockEdge_FILL:
+                    continue;
+                    break;
+                case BlockEdge_TOP_EDGE:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1]
+                        + p[blockIndex + m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_BOTTOM_EDGE:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1]
+                        + p[blockIndex - m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_LEFT_EDGE:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1]
+                        + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_RIGHT_EDGE:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex - 1]
+                        + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
+                        );
+                    break;
                 case BlockEdge_HORIZONTAL_PIPE:
                     newP = 0.5f * (div[blockIndex]
                         + p[blockIndex + 1] + p[blockIndex - 1]);
+                    break;
+                case BlockEdge_LOOPING_LEFT_EDGE:
+                    newP = 0.25f * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]
+                        + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_LOOPING_RIGHT_EDGE:
+                    newP = 0.25f * (div[blockIndex]
+                        + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]
+                        + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_LOOPING_TOP_LEFT_CORNER:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]
+                        + p[blockIndex + m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_LOOPING_TOP_RIGHT_CORNER:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]
+                        + p[blockIndex + m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_LOOPING_BOTTOM_LEFT_CORNER:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]
+                        + p[blockIndex - m_blockCountX]
+                        );
+                    break;
+                case BlockEdge_LOOPING_BOTTOM_RIGHT_CORNER:
+                    newP = (1.f / 3.f) * (div[blockIndex]
+                        + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]
+                        + p[blockIndex - m_blockCountX]
+                        );
                     break;
                 case BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE:
                     newP = 0.5f * (div[blockIndex]
@@ -424,13 +540,17 @@ void FluidBox::Project(float* velocX, float* velocY, float* p, float* div)
                     assert(false); // Invalid block edge type
                 }
 
-                float correction = abs(newP - p[blockIndex]);
+                float oldP = p[blockIndex];
+
+                float newPWithSOR = Math::lerp(oldP, newP, 1.5f);
+
+                float correction = abs(newPWithSOR - p[blockIndex]);
                 if (maxCorrection < correction)
                 {
                     maxCorrection = correction;
                 }
                     
-                p[blockIndex] = newP;
+                p[blockIndex] = newPWithSOR;
 
                 //uint8_t type = blockType[Index(i, j)];
                 //if (type != 0 && false)
