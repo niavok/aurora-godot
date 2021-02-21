@@ -104,8 +104,8 @@ position = Vector2( -2740.18, -247.391 )
 script = ExtResource( 4 )
 diffusion_coef = 0.001
 viscosity_coef = 10.0
-RENDER_DEBUG_SCALE = 10.0
-RENDER_DEBUG_VELOCITY_SCALE = 0.025
+RENDER_DEBUG_SCALE = 0.047
+RENDER_DEBUG_VELOCITY_SCALE = 1.0
 m_worldStepDt = 0.05
 RENDER_DEBUG_DENSITY = 0.01
 
