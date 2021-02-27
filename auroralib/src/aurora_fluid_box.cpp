@@ -14,13 +14,14 @@ namespace godot
 {
 
 FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHorizontalLoop)
-    //: m_blockCountXMask(0)
+//: m_blockCountXMask(0)
     : m_blockCountX(blockCountX)
     , m_blockCountY(blockCountY)
     , m_blockSize(blockSize)
+    , m_ooBlockSize(1.f / blockSize)
     , m_diffuseMaxIter(100)
     , m_viscosityMaxIter(100)
-    , m_projectMaxIter(10)
+    , m_projectMaxIter(200)
     , m_diffuseQualityThresold(1e-5f)
     , m_viscosityQualityThresold(1e-5f)
     , m_projectQualityThresold(0.1f)
@@ -29,7 +30,7 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
     m_activeVelocityBufferIndex = 0;
     m_inactiveVelocityBufferIndex = 1;
     m_blockCount = m_blockCountX * m_blockCountY;
-    m_horizontalVelocityCountY = m_blockCountY + 1;
+    m_horizontalVelocityCountY = m_blockCountY;
     m_verticalVelocityCountX = m_blockCountX;
     m_verticalVelocityCountY = m_blockCountY + 1;
 
@@ -72,10 +73,14 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
     m_verticalVelocityType = new uint8_t[m_verticalVelocityCount];
     m_horizontalVelocityType = new uint8_t[m_horizontalVelocityCount];
+    m_targetHorizontalVelocityWeight = new float[m_verticalVelocityCount];
+    m_targetVerticalVelocityWeight = new float[m_horizontalVelocityCount];
 
 
-    memset(m_verticalVelocityType, Velocity_FREE, m_horizontalVelocityCount * sizeof(uint8_t));
-    memset(m_horizontalVelocityType, Velocity_FREE, m_verticalVelocityCount * sizeof(uint8_t));
+    memset(m_horizontalVelocityType, Velocity_FREE, m_horizontalVelocityCount * sizeof(uint8_t));
+    memset(m_verticalVelocityType, Velocity_FREE, m_verticalVelocityCount * sizeof(uint8_t));
+
+    
 
 
     /*Vx = new float[m_vCountX];
@@ -124,6 +129,9 @@ FluidBox::~FluidBox()
     delete[] m_horizontalVelocityType;
     delete[] m_verticalVelocityType;
     
+    delete[] m_targetHorizontalVelocityWeight;
+    delete[] m_targetVerticalVelocityWeight;
+
     delete[] p1;
     delete[] p2;
     delete[] m_divBuffer;
@@ -318,8 +326,8 @@ void FluidBox::Step(float dt, float diff, float visc)
 {
 
 
-    memcpy(m_horizontalVelocityBuffer[m_inactiveVelocityBufferIndex], m_horizontalVelocityBuffer[m_activeVelocityBufferIndex], sizeof(float) * m_horizontalVelocityCount);
-    memcpy(m_verticalVelocityBuffer[m_inactiveVelocityBufferIndex], m_verticalVelocityBuffer[m_activeVelocityBufferIndex], sizeof(float) * m_verticalVelocityCount);
+    //memcpy(m_horizontalVelocityBuffer[m_inactiveVelocityBufferIndex], m_horizontalVelocityBuffer[m_activeVelocityBufferIndex], sizeof(float) * m_horizontalVelocityCount);
+    //memcpy(m_verticalVelocityBuffer[m_inactiveVelocityBufferIndex], m_verticalVelocityBuffer[m_activeVelocityBufferIndex], sizeof(float) * m_verticalVelocityCount);
 #if 0
     Diffuse(1, Vx0, Vx, visc, dt, m_viscosityMaxIter, m_viscosityQualityThresold);
     Diffuse(2, Vy0, Vy, visc, dt, m_viscosityMaxIter, m_viscosityQualityThresold);
@@ -336,9 +344,9 @@ void FluidBox::Step(float dt, float diff, float visc)
 
     Project(p1);
 
-    //AdvectVelocity(dt);
+    AdvectVelocity(dt);
 
-    //Project(p2);
+    Project(p2);
 
 #if 0
     for (int i = 0; i < 3; i++)
@@ -713,23 +721,23 @@ void FluidBox::Project(float* p)
         return vX + vY * blockCountX;
     };
 
-    for (int vIndex = 0; vIndex < m_horizontalVelocityCount; vIndex++)
+    for (int hIndex = 0; hIndex < m_horizontalVelocityCount; hIndex++)
     {
-        uint8_t vxType = m_horizontalVelocityType[vIndex];
+        uint8_t vxType = m_horizontalVelocityType[hIndex];
+        if (hIndex == 24686)
+        {
+            int plop = 1;
+        }
         switch (vxType)
         {
         case Velocity_ZERO:
-            horizontalVelocity[vIndex] = 0;
+            horizontalVelocity[hIndex] = 0;
             break;
         case Velocity_FREE:
-            horizontalVelocity[vIndex] += p[RightBlockIdx(vIndex)] - p[LeftBlockIdx(vIndex)];
-            if (horizontalVelocity[vIndex] < 0)
-            {
-                int plop = 1;
-            }
+            horizontalVelocity[hIndex] += p[RightBlockIdx(hIndex)] - p[LeftBlockIdx(hIndex)];
             break;
         case Velocity_LOOPING_LEFT:
-            horizontalVelocity[vIndex] += p[RightBlockIdx(vIndex)] - p[LeftBlockIdx(vIndex) + m_blockCountX];
+            horizontalVelocity[hIndex] += p[RightBlockIdx(hIndex)] - p[LeftBlockIdx(hIndex) + m_blockCountX];
             break;
         default:
             assert(false); // invalid velocity type
@@ -757,25 +765,32 @@ void FluidBox::Project(float* p)
 void FluidBox::AdvectVelocity(float stepDt)
 {
     // Get max velocity
+    int verticalVelocityCountX = m_verticalVelocityCountX;
+    int horizontalVelocityCountX = m_horizontalVelocityCountX;
+
+    int verticalVelocityCountY = m_verticalVelocityCountY;
+    int horizontalVelocityCountY = m_horizontalVelocityCountY;
+
     float maxVelocity = 0;
 
     float* initialHorizontalVelocity = m_horizontalVelocityBuffer[m_activeVelocityBufferIndex];
     float* initialVerticalVelocity = m_verticalVelocityBuffer[m_activeVelocityBufferIndex];
 
-    
-
-    for (int blockIndex = 0; blockIndex < m_blockCount; blockIndex++)
+    for (int vIndex = 0; vIndex < m_verticalVelocityCount; vIndex++)
     {
-        float vx = initialHorizontalVelocity[blockIndex];
-        float vy = initialVerticalVelocity[blockIndex];
-
-        if (vx > maxVelocity)
-        {
-            maxVelocity = vx;
-        }
+        float vy = abs(initialVerticalVelocity[vIndex]);
         if (vy > maxVelocity)
         {
             maxVelocity = vy;
+        }
+    }
+
+    for (int hIndex = 0; hIndex < m_horizontalVelocityCount; hIndex++)
+    {
+        float vx = abs(initialHorizontalVelocity[hIndex]);
+        if (vx > maxVelocity)
+        {
+            maxVelocity = vx;
         }
     }
 
@@ -783,6 +798,35 @@ void FluidBox::AdvectVelocity(float stepDt)
     int subStepCount = int(ceilf(stepDt / maxDtPerSubStep));
 
     float dt = stepDt / subStepCount;
+
+
+    auto HIndex = [horizontalVelocityCountX](int hi, int hj) -> int
+    {
+        return hi % horizontalVelocityCountX + hj * horizontalVelocityCountX;
+    };
+
+    auto VIndex = [verticalVelocityCountX](int vi, int vj) -> int
+    {
+        return (vi+ verticalVelocityCountX) % verticalVelocityCountX + vj * verticalVelocityCountX;
+    };
+
+    auto VIndexNeighbour = [verticalVelocityCountX, VIndex](int hi, int hj, int di, int dj) -> int {
+        // Give vertical velocity neighbour relative to a i, j hVelocity 0 or 1
+        int vi = hi + di - 1;
+        int vj = hj + dj;
+        return VIndex(vi, vj);
+    };
+
+    auto HIndexNeighbour = [horizontalVelocityCountX, HIndex](int vi, int vj, int di, int dj) -> int {
+        // Give horizontal velocity neighbour relative to a i, j vVelocity 0 or 1
+        int hi = vi + di;
+        int hj = vj + dj - 1;
+        return HIndex(hi, hj);
+    };
+
+    float* targetHorizontalVelocityWeight = m_targetHorizontalVelocityWeight;
+    float* targetVerticalVelocityWeight = m_targetVerticalVelocityWeight;
+
 
     for (int k = 0; k < subStepCount; k++)
     {
@@ -793,31 +837,367 @@ void FluidBox::AdvectVelocity(float stepDt)
         float* targetVerticalVelocity = m_verticalVelocityBuffer[m_inactiveVelocityBufferIndex];
 
 
+        memset(targetHorizontalVelocity, 0, m_horizontalVelocityCount * sizeof(float));
+        memset(targetVerticalVelocity, 0, m_verticalVelocityCount * sizeof(float));
+        memset(targetHorizontalVelocityWeight, 0, m_horizontalVelocityCount * sizeof(float));
+
         // Advect one substep
-        for (int vIndex = 0; vIndex < m_horizontalVelocityCount; vIndex++)
+        for (int j = 0; j < m_horizontalVelocityCountY; j++)
         {
-            uint8_t horizontalVelocityType = m_horizontalVelocityType[vIndex];
+            for (int i = 0; i < m_horizontalVelocityCountX; i++)
+            {
+                int hIndex = i + j * m_horizontalVelocityCountX;
+
+                uint8_t horizontalVelocityType = m_horizontalVelocityType[hIndex];
+
+                if (horizontalVelocityType == Velocity_ZERO)
+                {
+                    targetHorizontalVelocityWeight[hIndex] += 1;
+                    continue;
+                }
+                else
+                {
+                    float vx = horizontalVelocity[hIndex];
+                    float vy = 0.25f * (
+                        verticalVelocity[VIndexNeighbour(i, j, 0,0)]
+                        + verticalVelocity[VIndexNeighbour(i, j, 1, 0)]
+                        + verticalVelocity[VIndexNeighbour(i, j, 0, 1)]
+                        + verticalVelocity[VIndexNeighbour(i, j, 1, 1)]);
+
+                    if (vx != 0)
+                    {
+                        int plop = 0;
+                    }
 
 
-            //if (horizontalVelocityType == Velocity_FREE)
-            //{
-            //    float vx = horizontalVelocity[vIndex];
-            //    float vy;
-            //    if (vx > 0)
-            //    {
-            //        vy =
-            //            float dx = -vx * dt;
-            //    }
+                    //if (vx < 0)
+                    //{
+                    //    if (horizontalVelocityType == Velocity_LOOPING_LEFT)
+                    //    {
+                    //        vy = 0.5f * (verticalVelocity[m_horizontalVelocityCountX - 1 + j * m_verticalVelocityCountX] + verticalVelocity[m_horizontalVelocityCountX - 1 + (j + 1) * m_verticalVelocityCountX]);
+                    //    }
+                    //    else
+                    //    {
+                    //        vy = 0.5f * (verticalVelocity[i - 1 + j * m_verticalVelocityCountX] + verticalVelocity[i - 1 + (j + 1) * m_verticalVelocityCountX]);
+                    //    }
+                    //}
+                    //else if (vx > 0)
+                    //{
+                    //    vy = 0.5f * (verticalVelocity[i + j * m_verticalVelocityCountX] + verticalVelocity[i + (j + 1) * m_verticalVelocityCountX]);
+                    //}
+                    //else
+                    //{
+                    //    if (horizontalVelocityType == Velocity_LOOPING_LEFT)
+                    //    {
+                    //        vy = 0.25f * (verticalVelocity[m_horizontalVelocityCountX - 1 + j * m_verticalVelocityCountX] + verticalVelocity[m_horizontalVelocityCountX - 1 + (j + 1) * m_verticalVelocityCountX]
+                    //            + verticalVelocity[i + j * m_verticalVelocityCountX] + verticalVelocity[i + (j + 1) * m_verticalVelocityCountX]);
+                    //    }
+                    //    else
+                    //    {
+                    //        vy = 0.25f * (verticalVelocity[i - 1 + j * m_verticalVelocityCountX] + verticalVelocity[i - 1 + (j + 1) * m_verticalVelocityCountX]
+                    //            + verticalVelocity[i + j * m_verticalVelocityCountX] + verticalVelocity[i + (j + 1) * m_verticalVelocityCountX]);
+                    //    }
+                    //}
 
-            //}
-            //else if (vxType != Velocity_ZERO)
-            //{
-            //    // 
-            //}
+                    float dx = vx * dt;
+                    float dy = vy * dt;
+
+                    float x = i + dx * m_ooBlockSize;
+                    float y = j + dy * m_ooBlockSize;
+                                        
+                    float i0 = floorf(x);
+                    float i1 = i0 + 1.0f;
+                    
+                    float j0 = floorf(y);
+                    float j1 = j0 + 1.0f;
+                    
+                    float s1 = x - i0;
+                    float s0 = 1.0f - s1;
+                    float t1 = y - j0;
+                    float t0 = 1.0f - t1;
+                    
+                    int i0i = (int)i0;
+                    int i1i = (int)i1;
+                    int j0i = (int)j0;
+                    int j1i = (int)j1;
+
+
+                    //if (i0i < 0)
+                    //{
+                    //    if (m_isHorizontalLoop)
+                    //    {
+                    //        i0i = m_horizontalVelocityCountX - 1;
+                    //    }
+                    //    else
+                    //    {
+                    //        i0i = 0;
+                    //    }
+                    //}
+
+
+                    //if (i1i >= m_horizontalVelocityCountX)
+                    //{
+                    //    if (m_isHorizontalLoop)
+                    //    {
+                    //        i1i = 0;
+                    //    }
+                    //    else
+                    //    {
+                    //        i1i = m_horizontalVelocityCountX - 1;
+                    //    }
+                    //}
+
+                    if (j0i < 0)
+                    {
+                        j0i = 0;
+                    }
+
+                    if (j1i > horizontalVelocityCountY - 1)
+                    {
+                        j1i = horizontalVelocityCountY - 1;
+                    }
+
+
+
+                    //assert(i1i >= 0);
+                    assert(j1i >= 0);
+                    //assert(i0i < m_horizontalVelocityCountX);
+                    assert(j0i < horizontalVelocityCountY);
+
+
+                    int tlIndex = HIndex(i0i, j0i);
+                    int trIndex = HIndex(i1i, j0i);
+                    int blIndex = HIndex(i0i, j1i);
+                    int brIndex = HIndex(i1i, j1i);
+
+                    float tlWeight = s0 * t0;
+                    float trWeight = s1 * t0;
+                    float blWeight = s0 * t1;
+                    float brWeight = s1 * t1;
+
+                    targetHorizontalVelocity[tlIndex] += vx * tlWeight;
+                    targetHorizontalVelocity[trIndex] += vx * trWeight;
+                    targetHorizontalVelocity[blIndex] += vx * blWeight;
+                    targetHorizontalVelocity[brIndex] += vx * brWeight;
+
+                    targetHorizontalVelocityWeight[tlIndex] += tlWeight;
+                    targetHorizontalVelocityWeight[trIndex] += trWeight;
+                    targetHorizontalVelocityWeight[blIndex] += blWeight;
+                    targetHorizontalVelocityWeight[brIndex] += brWeight;
+
+
+                    /*targetHorizontalVelocity[vIndex] = s0 * (t0 * horizontalVelocity[tlIndex] + t1 * horizontalVelocity[trIndex])
+                        + s1 * (t0 * horizontalVelocity[blIndex] + t1 * horizontalVelocity[brIndex]);*/
+                }
+            }
+        }
+
+        for (int j = 0; j < verticalVelocityCountY; j++)
+        {
+            for (int i = 0; i < verticalVelocityCountX; i++)
+            {
+                int vIndex = i + j * verticalVelocityCountX;
+
+                uint8_t verticalVelocityType = m_verticalVelocityType[vIndex];
+
+                if (verticalVelocityType == Velocity_ZERO)
+                {
+                    targetVerticalVelocityWeight[vIndex] += 1;
+                    continue;
+                }
+                else
+                {
+                    float vy = verticalVelocity[vIndex];
+                    float vx = 0.25f * (
+                        horizontalVelocity[HIndexNeighbour(i, j, 0, 0)]
+                        + horizontalVelocity[HIndexNeighbour(i, j, 1, 0)]
+                        + horizontalVelocity[HIndexNeighbour(i, j, 0, 1)]
+                        + horizontalVelocity[HIndexNeighbour(i, j, 1, 1)]);
+
+
+
+                    float dx = vx * dt;
+                    float dy = vy * dt;
+
+                    float x = i + dx * m_ooBlockSize;
+                    float y = j + dy * m_ooBlockSize;
+
+                    float i0 = floorf(x);
+                    float i1 = i0 + 1.0f;
+
+                    float j0 = floorf(y);
+                    float j1 = j0 + 1.0f;
+
+                    float s1 = x - i0;
+                    float s0 = 1.0f - s1;
+                    float t1 = y - j0;
+                    float t0 = 1.0f - t1;
+
+                    int i0i = (int)i0;
+                    int i1i = (int)i1;
+                    int j0i = (int)j0;
+                    int j1i = (int)j1;
+
+
+                    if (j0i < 0)
+                    {
+                        j0i = 0;
+                    }
+
+                    if (j1i > verticalVelocityCountY - 1)
+                    {
+                        j1i = verticalVelocityCountY - 1;
+                    }
+
+                    assert(j1i >= 0);
+                    assert(j0i < verticalVelocityCountY);
+
+                    int tlIndex = VIndex(i0i, j0i);
+                    int trIndex = VIndex(i1i, j0i);
+                    int blIndex = VIndex(i0i, j1i);
+                    int brIndex = VIndex(i1i, j1i);
+
+                    float tlWeight = s0 * t0;
+                    float trWeight = s1 * t0;
+                    float blWeight = s0 * t1;
+                    float brWeight = s1 * t1;
+
+                    targetVerticalVelocity[tlIndex] += vy * tlWeight;
+                    targetVerticalVelocity[trIndex] += vy * trWeight;
+                    targetVerticalVelocity[blIndex] += vy * blWeight;
+                    targetVerticalVelocity[brIndex] += vy * brWeight;
+
+                    targetVerticalVelocityWeight[tlIndex] += tlWeight;
+                    targetVerticalVelocityWeight[trIndex] += trWeight;
+                    targetVerticalVelocityWeight[blIndex] += blWeight;
+                    targetVerticalVelocityWeight[brIndex] += brWeight;
+                }
+            }
 
         }
 
+        for (int vIndex = 0; vIndex < m_verticalVelocityCount; vIndex++)
+        {
+            targetVerticalVelocity[vIndex] /= targetVerticalVelocityWeight[vIndex];
+        }
+
+
+
+        for (int hIndex = 0; hIndex < m_horizontalVelocityCount; hIndex++)
+        {
+            targetHorizontalVelocity[hIndex] /= targetHorizontalVelocityWeight[hIndex];
+        }
+
         SwapVelocityBuffers();
+
+
+                /*if (verticalVelocityType == Velocity_ZERO)
+                {
+                    targetVerticalVelocity[vIndex] = 0;
+                    continue;
+                }
+                else
+                {
+                    float vy = verticalVelocity[vIndex];
+                    float vx;
+
+                    int righthi = i + 1;
+
+                    if (verticalVelocityType == Velocity_LOOPING_RIGHT)
+                    {
+                        righthi = 0;
+                    }
+
+                    if (vy < 0)
+                    {
+                        vx = 0.5f * (horizontalVelocity[i + (j-1) * m_horizontalVelocityCountX] + horizontalVelocity[righthi + (j - 1) * m_horizontalVelocityCountX]);
+                    }
+                    else if (vy > 0)
+                    {
+                        vx = 0.5f * (horizontalVelocity[i + j * m_horizontalVelocityCountX] + horizontalVelocity[righthi + j * m_horizontalVelocityCountX]);
+                    }
+                    else
+                    {
+                        vx = 0.25f * (horizontalVelocity[i + (j - 1) * m_horizontalVelocityCountX] + horizontalVelocity[righthi + (j - 1) * m_horizontalVelocityCountX]
+                            + horizontalVelocity[i + j * m_horizontalVelocityCountX] + horizontalVelocity[righthi + j * m_horizontalVelocityCountX]);
+                    }
+
+                    float dx = vx * dt;
+                    float dy = vy * dt;
+
+                    float x = i + dx * m_ooBlockSize;
+                    float y = j + dy * m_ooBlockSize;
+
+                    float i0 = floorf(x);
+                    float i1 = i0 + 1.0f;
+
+                    float j0 = floorf(y);
+                    float j1 = j0 + 1.0f;
+
+                    float s1 = x - i0;
+                    float s0 = 1.0f - s1;
+                    float t1 = y - j0;
+                    float t0 = 1.0f - t1;
+
+                    int i0i = (int)i0;
+                    int i1i = (int)i1;
+                    int j0i = (int)j0;
+                    int j1i = (int)j1;
+
+
+                    if (i0i < 0)
+                    {
+                        if (m_isHorizontalLoop)
+                        {
+                            i0i = m_verticalVelocityCountX - 1;
+                        }
+                        else
+                        {
+                            i0i = 0;
+                        }
+                    }
+
+
+                    if (i1i >= m_verticalVelocityCountX)
+                    {
+                        if (m_isHorizontalLoop)
+                        {
+                            i1i = 0;
+                        }
+                        else
+                        {
+                            i1i = m_verticalVelocityCountX - 1;
+                        }
+                    }
+
+                    if (j0i < 0)
+                    {
+                        j0i = 0;
+                    }
+
+                    if (j1i > m_verticalVelocityCountY - 1)
+                    {
+                        j1i = m_verticalVelocityCountY - 1;
+                    }
+
+
+
+                    assert(i1i >= 0);
+                    assert(j1i >= 0);
+                    assert(i0i < m_verticalVelocityCountX);
+                    assert(j0i < m_verticalVelocityCountY);
+
+
+                    int tlIndex = i0i + j0i * m_verticalVelocityCountX;
+                    int trIndex = i1i + j0i * m_verticalVelocityCountX;
+                    int blIndex = i0i + j1i * m_verticalVelocityCountX;
+                    int brIndex = i1i + j1i * m_verticalVelocityCountX;
+
+
+                    targetVerticalVelocity[vIndex] = s0 * (t0 * verticalVelocity[tlIndex] + t1 * verticalVelocity[trIndex])
+                        + s1 * (t0 * verticalVelocity[blIndex] + t1 * verticalVelocity[brIndex]);
+                }*/
+
 
             //switch (vxType)
             //{
@@ -835,9 +1215,6 @@ void FluidBox::AdvectVelocity(float stepDt)
             //default:
             //    assert(false); // invalid velocity type
             //}
-
-
-
         
     }
 }
@@ -961,10 +1338,7 @@ void FluidBox::CompileGrid()
             int blockIndex = BlockIndex(blockX, blockY);
             uint8_t& type = m_blockEdgeType[blockIndex];
 
-            if (type == BlockEdge_FILL)
-            {
-                continue;
-            }
+
 
             auto LeftHorizontalVelocityIndex = [this](int blockX, int blockY) -> int {
                 return blockX + m_horizontalVelocityCountX * blockY;
@@ -1000,6 +1374,13 @@ void FluidBox::CompileGrid()
                 m_verticalVelocityType[TopVerticalVelocityIndex(blockX, blockY)] = topType;
                 m_verticalVelocityType[BottomVerticalVelocityIndex(blockX, blockY)] = bottomType;               
             };
+
+
+            if (type == BlockEdge_FILL)
+            {
+                ConfigureVelocities(Velocity_ZERO, Velocity_ZERO, Velocity_ZERO, Velocity_ZERO);
+                continue;
+            }
 
             bool isTopFilled = blockY == 0 || m_blockEdgeType[blockIndex - m_blockCountX] == BlockEdge_FILL;
             bool isBottomFilled = blockY == m_blockCountY-1 || m_blockEdgeType[blockIndex + m_blockCountX] == BlockEdge_FILL;

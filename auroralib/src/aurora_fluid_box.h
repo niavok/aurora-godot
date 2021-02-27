@@ -67,6 +67,9 @@ public:
     float* m_horizontalVelocityBuffer[2];
     float* m_verticalVelocityBuffer[2];
 
+    float* m_targetHorizontalVelocityWeight;
+    float* m_targetVerticalVelocityWeight;
+
     int m_activeVelocityBufferIndex;
     int m_inactiveVelocityBufferIndex;
 
@@ -79,6 +82,7 @@ public:
     int m_verticalVelocityCountY;
     int m_verticalVelocityCount;
     float m_blockSize;
+    float m_ooBlockSize;
 
     bool m_isHorizontalLoop;
 private:

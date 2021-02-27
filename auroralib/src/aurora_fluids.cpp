@@ -217,8 +217,8 @@ void Fluids::StepWorld(float dt)
 
     if (m_worldEnableSun)
     {
-        //for (int j = 10; j < m_fluidBox->m_blockCountY-1; j++)
-        for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+        for (int j = 40; j < 60; j++)
+        //for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
         {
             m_fluidBox->SetHorizontalVelocityAtLeft(50, j, 100.f);
         }
