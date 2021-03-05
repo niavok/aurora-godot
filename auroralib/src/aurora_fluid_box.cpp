@@ -18,6 +18,9 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
     : m_blockCountX(blockCountX)
     , m_blockCountY(blockCountY)
     , m_blockSize(blockSize)
+    , m_blockDepth(1)
+    , m_blockSection(m_blockSize * m_blockDepth)
+    , m_blockVolume(m_blockSize* m_blockSize* m_blockDepth)
     , m_ooBlockSize(1.f / blockSize)
     , m_diffuseMaxIter(100)
     , m_viscosityMaxIter(100)
@@ -29,6 +32,8 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 {
     m_activeVelocityBufferIndex = 0;
     m_inactiveVelocityBufferIndex = 1;
+    m_activeContentBufferIndex = 0;
+    m_inactiveContentBufferIndex = 1;
     m_blockCount = m_blockCountX * m_blockCountY;
     m_horizontalVelocityCountY = m_blockCountY;
     m_verticalVelocityCountX = m_blockCountX;
@@ -58,8 +63,8 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
     for (int i = 0; i < 3; i++)
     {
-        tempDensity[i] = new float[m_blockCount];
-        density[i] = new float[m_blockCount];
+        //tempDensity[i] = new float[m_blockCount];
+        //density[i] = new float[m_blockCount];
     }
 
     for (int i = 0; i < 2; i++)
@@ -69,13 +74,14 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
         memset(m_horizontalVelocityBuffer[i], 0, m_horizontalVelocityCount * sizeof(float));
         memset(m_verticalVelocityBuffer[i], 0, m_verticalVelocityCount * sizeof(float));
+
+        m_contentBuffer[i] = new Content[m_blockCount];
+
+        memset(m_contentBuffer[i], 0, m_blockCount * sizeof(Content));
     }
 
     m_verticalVelocityType = new uint8_t[m_verticalVelocityCount];
     m_horizontalVelocityType = new uint8_t[m_horizontalVelocityCount];
-    m_targetHorizontalVelocityWeight = new float[m_verticalVelocityCount];
-    m_targetVerticalVelocityWeight = new float[m_horizontalVelocityCount];
-
 
     memset(m_horizontalVelocityType, Velocity_FREE, m_horizontalVelocityCount * sizeof(uint8_t));
     memset(m_verticalVelocityType, Velocity_FREE, m_verticalVelocityCount * sizeof(uint8_t));
@@ -98,11 +104,11 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
     for (int i = 0; i < m_blockCount; i++)
     {
-        for (int j = 0; j < 3; j++)
-        {
-            tempDensity[j][i] = 0.f;
-            density[j][i] = 0.f;
-        }
+        //for (int j = 0; j < 3; j++)
+        //{
+        //    tempDensity[j][i] = 0.f;
+        //    density[j][i] = 0.f;
+        //}
 
         p1[i] = 0.f;
         p2[i] = 0.f;
@@ -114,23 +120,21 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
 FluidBox::~FluidBox()
 {
-    for (int i = 0; i < 3; i++)
+    /*for (int i = 0; i < 3; i++)
     {
         delete[] tempDensity[i];
         delete[] density[i];
-    }
+    }*/
 
     for (int i = 0; i < 2; i++)
     {
         delete[] m_horizontalVelocityBuffer[i];
         delete[] m_verticalVelocityBuffer[i];
+        delete[] m_contentBuffer[i];
     }
 
     delete[] m_horizontalVelocityType;
     delete[] m_verticalVelocityType;
-    
-    delete[] m_targetHorizontalVelocityWeight;
-    delete[] m_targetVerticalVelocityWeight;
 
     delete[] p1;
     delete[] p2;
@@ -151,8 +155,20 @@ int FluidBox::BlockIndex(int x, int y)
 
 void FluidBox::AddDensity(int x, int y, float amount, int color)
 {
-    density[color][BlockIndex(x, y)] += amount;
-    tempDensity[color][BlockIndex(x, y)] += amount;
+    Content& content = m_contentBuffer[m_activeContentBufferIndex][x + y * m_blockCountX];
+
+    if (color == 0)
+    {
+        content.density0 += amount;
+    }
+    else if (color == 1)
+    {
+        content.density1 += amount;
+    }
+    else if (color == 2)
+    {
+        content.density2 += amount;
+    }
 }
 
 //void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
@@ -179,6 +195,12 @@ void FluidBox::SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocit
 {
     int velocityIndex = blockX + m_horizontalVelocityCountX * blockY;
     m_horizontalVelocityBuffer[m_activeVelocityBufferIndex][velocityIndex] = velocity;
+}
+
+void FluidBox::AddHorizontalVelocityAtLeft(int blockX, int blockY, float velocity)
+{
+    int velocityIndex = blockX + m_horizontalVelocityCountX * blockY;
+    m_horizontalVelocityBuffer[m_activeVelocityBufferIndex][velocityIndex] += velocity;
 }
 
 //
@@ -324,8 +346,6 @@ void FluidBox::SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocit
 
 void FluidBox::Step(float dt, float diff, float visc)
 {
-
-
     //memcpy(m_horizontalVelocityBuffer[m_inactiveVelocityBufferIndex], m_horizontalVelocityBuffer[m_activeVelocityBufferIndex], sizeof(float) * m_horizontalVelocityCount);
     //memcpy(m_verticalVelocityBuffer[m_inactiveVelocityBufferIndex], m_verticalVelocityBuffer[m_activeVelocityBufferIndex], sizeof(float) * m_verticalVelocityCount);
 #if 0
@@ -342,14 +362,16 @@ void FluidBox::Step(float dt, float diff, float visc)
     Advect(2, Vy, Vy0, Vx0, Vy0, dt);
 #endif
 
+    
     Project(p1);
-
+    
     AdvectVelocity(dt);
-
+ 
     Project(p2);
 
-#if 0
-    for (int i = 0; i < 3; i++)
+    AdvectContent(dt);
+
+    /*for (int i = 0; i < 3; i++)
     {
         float* color_s = tempDensity[i];
         float* color_density = density[i];
@@ -357,8 +379,8 @@ void FluidBox::Step(float dt, float diff, float visc)
         memcpy(color_s, color_density, sizeof(float) * m_blockCount);
         Diffuse(0, color_s, color_density, diff, dt, m_diffuseMaxIter, m_diffuseQualityThresold);
         Advect(0, color_density, color_s, Vx, Vy, dt);
-    }
-#endif
+    }*/
+
 }
 
 void FluidBox::Diffuse(int b, float* x, float* x0, float diff, float dt, int maxIter, float qualityThresold)
@@ -802,7 +824,7 @@ void FluidBox::AdvectVelocity(float stepDt)
 
     auto HIndex = [horizontalVelocityCountX](int hi, int hj) -> int
     {
-        return hi % horizontalVelocityCountX + hj * horizontalVelocityCountX;
+        return (hi + horizontalVelocityCountX) % horizontalVelocityCountX + hj * horizontalVelocityCountX;
     };
 
     auto VIndex = [verticalVelocityCountX](int vi, int vj) -> int
@@ -824,10 +846,6 @@ void FluidBox::AdvectVelocity(float stepDt)
         return HIndex(hi, hj);
     };
 
-    float* targetHorizontalVelocityWeight = m_targetHorizontalVelocityWeight;
-    float* targetVerticalVelocityWeight = m_targetVerticalVelocityWeight;
-
-
     for (int k = 0; k < subStepCount; k++)
     {
         float* horizontalVelocity = m_horizontalVelocityBuffer[m_activeVelocityBufferIndex];
@@ -835,11 +853,6 @@ void FluidBox::AdvectVelocity(float stepDt)
 
         float* targetHorizontalVelocity = m_horizontalVelocityBuffer[m_inactiveVelocityBufferIndex];
         float* targetVerticalVelocity = m_verticalVelocityBuffer[m_inactiveVelocityBufferIndex];
-
-
-        memset(targetHorizontalVelocity, 0, m_horizontalVelocityCount * sizeof(float));
-        memset(targetVerticalVelocity, 0, m_verticalVelocityCount * sizeof(float));
-        memset(targetHorizontalVelocityWeight, 0, m_horizontalVelocityCount * sizeof(float));
 
         // Advect one substep
         for (int j = 0; j < m_horizontalVelocityCountY; j++)
@@ -852,7 +865,7 @@ void FluidBox::AdvectVelocity(float stepDt)
 
                 if (horizontalVelocityType == Velocity_ZERO)
                 {
-                    targetHorizontalVelocityWeight[hIndex] += 1;
+                    targetHorizontalVelocity[hIndex] = 0;
                     continue;
                 }
                 else
@@ -864,43 +877,8 @@ void FluidBox::AdvectVelocity(float stepDt)
                         + verticalVelocity[VIndexNeighbour(i, j, 0, 1)]
                         + verticalVelocity[VIndexNeighbour(i, j, 1, 1)]);
 
-                    if (vx != 0)
-                    {
-                        int plop = 0;
-                    }
-
-
-                    //if (vx < 0)
-                    //{
-                    //    if (horizontalVelocityType == Velocity_LOOPING_LEFT)
-                    //    {
-                    //        vy = 0.5f * (verticalVelocity[m_horizontalVelocityCountX - 1 + j * m_verticalVelocityCountX] + verticalVelocity[m_horizontalVelocityCountX - 1 + (j + 1) * m_verticalVelocityCountX]);
-                    //    }
-                    //    else
-                    //    {
-                    //        vy = 0.5f * (verticalVelocity[i - 1 + j * m_verticalVelocityCountX] + verticalVelocity[i - 1 + (j + 1) * m_verticalVelocityCountX]);
-                    //    }
-                    //}
-                    //else if (vx > 0)
-                    //{
-                    //    vy = 0.5f * (verticalVelocity[i + j * m_verticalVelocityCountX] + verticalVelocity[i + (j + 1) * m_verticalVelocityCountX]);
-                    //}
-                    //else
-                    //{
-                    //    if (horizontalVelocityType == Velocity_LOOPING_LEFT)
-                    //    {
-                    //        vy = 0.25f * (verticalVelocity[m_horizontalVelocityCountX - 1 + j * m_verticalVelocityCountX] + verticalVelocity[m_horizontalVelocityCountX - 1 + (j + 1) * m_verticalVelocityCountX]
-                    //            + verticalVelocity[i + j * m_verticalVelocityCountX] + verticalVelocity[i + (j + 1) * m_verticalVelocityCountX]);
-                    //    }
-                    //    else
-                    //    {
-                    //        vy = 0.25f * (verticalVelocity[i - 1 + j * m_verticalVelocityCountX] + verticalVelocity[i - 1 + (j + 1) * m_verticalVelocityCountX]
-                    //            + verticalVelocity[i + j * m_verticalVelocityCountX] + verticalVelocity[i + (j + 1) * m_verticalVelocityCountX]);
-                    //    }
-                    //}
-
-                    float dx = vx * dt;
-                    float dy = vy * dt;
+                    float dx = - vx * dt;
+                    float dy = - vy * dt;
 
                     float x = i + dx * m_ooBlockSize;
                     float y = j + dy * m_ooBlockSize;
@@ -921,32 +899,6 @@ void FluidBox::AdvectVelocity(float stepDt)
                     int j0i = (int)j0;
                     int j1i = (int)j1;
 
-
-                    //if (i0i < 0)
-                    //{
-                    //    if (m_isHorizontalLoop)
-                    //    {
-                    //        i0i = m_horizontalVelocityCountX - 1;
-                    //    }
-                    //    else
-                    //    {
-                    //        i0i = 0;
-                    //    }
-                    //}
-
-
-                    //if (i1i >= m_horizontalVelocityCountX)
-                    //{
-                    //    if (m_isHorizontalLoop)
-                    //    {
-                    //        i1i = 0;
-                    //    }
-                    //    else
-                    //    {
-                    //        i1i = m_horizontalVelocityCountX - 1;
-                    //    }
-                    //}
-
                     if (j0i < 0)
                     {
                         j0i = 0;
@@ -957,11 +909,7 @@ void FluidBox::AdvectVelocity(float stepDt)
                         j1i = horizontalVelocityCountY - 1;
                     }
 
-
-
-                    //assert(i1i >= 0);
                     assert(j1i >= 0);
-                    //assert(i0i < m_horizontalVelocityCountX);
                     assert(j0i < horizontalVelocityCountY);
 
 
@@ -969,25 +917,9 @@ void FluidBox::AdvectVelocity(float stepDt)
                     int trIndex = HIndex(i1i, j0i);
                     int blIndex = HIndex(i0i, j1i);
                     int brIndex = HIndex(i1i, j1i);
-
-                    float tlWeight = s0 * t0;
-                    float trWeight = s1 * t0;
-                    float blWeight = s0 * t1;
-                    float brWeight = s1 * t1;
-
-                    targetHorizontalVelocity[tlIndex] += vx * tlWeight;
-                    targetHorizontalVelocity[trIndex] += vx * trWeight;
-                    targetHorizontalVelocity[blIndex] += vx * blWeight;
-                    targetHorizontalVelocity[brIndex] += vx * brWeight;
-
-                    targetHorizontalVelocityWeight[tlIndex] += tlWeight;
-                    targetHorizontalVelocityWeight[trIndex] += trWeight;
-                    targetHorizontalVelocityWeight[blIndex] += blWeight;
-                    targetHorizontalVelocityWeight[brIndex] += brWeight;
-
-
-                    /*targetHorizontalVelocity[vIndex] = s0 * (t0 * horizontalVelocity[tlIndex] + t1 * horizontalVelocity[trIndex])
-                        + s1 * (t0 * horizontalVelocity[blIndex] + t1 * horizontalVelocity[brIndex]);*/
+                    
+                    targetHorizontalVelocity[hIndex] = s0 * (t0 * horizontalVelocity[tlIndex] + t1 * horizontalVelocity[blIndex])
+                        + s1 * (t0 * horizontalVelocity[trIndex] + t1 * horizontalVelocity[brIndex]);
                 }
             }
         }
@@ -1002,7 +934,7 @@ void FluidBox::AdvectVelocity(float stepDt)
 
                 if (verticalVelocityType == Velocity_ZERO)
                 {
-                    targetVerticalVelocityWeight[vIndex] += 1;
+                    targetVerticalVelocity[vIndex] = 0;
                     continue;
                 }
                 else
@@ -1014,10 +946,8 @@ void FluidBox::AdvectVelocity(float stepDt)
                         + horizontalVelocity[HIndexNeighbour(i, j, 0, 1)]
                         + horizontalVelocity[HIndexNeighbour(i, j, 1, 1)]);
 
-
-
-                    float dx = vx * dt;
-                    float dy = vy * dt;
+                    float dx = -vx * dt;
+                    float dy = -vy * dt;
 
                     float x = i + dx * m_ooBlockSize;
                     float y = j + dy * m_ooBlockSize;
@@ -1037,7 +967,6 @@ void FluidBox::AdvectVelocity(float stepDt)
                     int i1i = (int)i1;
                     int j0i = (int)j0;
                     int j1i = (int)j1;
-
 
                     if (j0i < 0)
                     {
@@ -1057,172 +986,220 @@ void FluidBox::AdvectVelocity(float stepDt)
                     int blIndex = VIndex(i0i, j1i);
                     int brIndex = VIndex(i1i, j1i);
 
-                    float tlWeight = s0 * t0;
-                    float trWeight = s1 * t0;
-                    float blWeight = s0 * t1;
-                    float brWeight = s1 * t1;
-
-                    targetVerticalVelocity[tlIndex] += vy * tlWeight;
-                    targetVerticalVelocity[trIndex] += vy * trWeight;
-                    targetVerticalVelocity[blIndex] += vy * blWeight;
-                    targetVerticalVelocity[brIndex] += vy * brWeight;
-
-                    targetVerticalVelocityWeight[tlIndex] += tlWeight;
-                    targetVerticalVelocityWeight[trIndex] += trWeight;
-                    targetVerticalVelocityWeight[blIndex] += blWeight;
-                    targetVerticalVelocityWeight[brIndex] += brWeight;
+                    targetVerticalVelocity[vIndex] = s0 * (t0 * verticalVelocity[tlIndex] + t1 * verticalVelocity[blIndex])
+                        + s1 * (t0 * verticalVelocity[trIndex] + t1 * verticalVelocity[brIndex]);
                 }
             }
 
         }
 
-        for (int vIndex = 0; vIndex < m_verticalVelocityCount; vIndex++)
-        {
-            targetVerticalVelocity[vIndex] /= targetVerticalVelocityWeight[vIndex];
-        }
-
-
-
-        for (int hIndex = 0; hIndex < m_horizontalVelocityCount; hIndex++)
-        {
-            targetHorizontalVelocity[hIndex] /= targetHorizontalVelocityWeight[hIndex];
-        }
-
         SwapVelocityBuffers();
-
-
-                /*if (verticalVelocityType == Velocity_ZERO)
-                {
-                    targetVerticalVelocity[vIndex] = 0;
-                    continue;
-                }
-                else
-                {
-                    float vy = verticalVelocity[vIndex];
-                    float vx;
-
-                    int righthi = i + 1;
-
-                    if (verticalVelocityType == Velocity_LOOPING_RIGHT)
-                    {
-                        righthi = 0;
-                    }
-
-                    if (vy < 0)
-                    {
-                        vx = 0.5f * (horizontalVelocity[i + (j-1) * m_horizontalVelocityCountX] + horizontalVelocity[righthi + (j - 1) * m_horizontalVelocityCountX]);
-                    }
-                    else if (vy > 0)
-                    {
-                        vx = 0.5f * (horizontalVelocity[i + j * m_horizontalVelocityCountX] + horizontalVelocity[righthi + j * m_horizontalVelocityCountX]);
-                    }
-                    else
-                    {
-                        vx = 0.25f * (horizontalVelocity[i + (j - 1) * m_horizontalVelocityCountX] + horizontalVelocity[righthi + (j - 1) * m_horizontalVelocityCountX]
-                            + horizontalVelocity[i + j * m_horizontalVelocityCountX] + horizontalVelocity[righthi + j * m_horizontalVelocityCountX]);
-                    }
-
-                    float dx = vx * dt;
-                    float dy = vy * dt;
-
-                    float x = i + dx * m_ooBlockSize;
-                    float y = j + dy * m_ooBlockSize;
-
-                    float i0 = floorf(x);
-                    float i1 = i0 + 1.0f;
-
-                    float j0 = floorf(y);
-                    float j1 = j0 + 1.0f;
-
-                    float s1 = x - i0;
-                    float s0 = 1.0f - s1;
-                    float t1 = y - j0;
-                    float t0 = 1.0f - t1;
-
-                    int i0i = (int)i0;
-                    int i1i = (int)i1;
-                    int j0i = (int)j0;
-                    int j1i = (int)j1;
-
-
-                    if (i0i < 0)
-                    {
-                        if (m_isHorizontalLoop)
-                        {
-                            i0i = m_verticalVelocityCountX - 1;
-                        }
-                        else
-                        {
-                            i0i = 0;
-                        }
-                    }
-
-
-                    if (i1i >= m_verticalVelocityCountX)
-                    {
-                        if (m_isHorizontalLoop)
-                        {
-                            i1i = 0;
-                        }
-                        else
-                        {
-                            i1i = m_verticalVelocityCountX - 1;
-                        }
-                    }
-
-                    if (j0i < 0)
-                    {
-                        j0i = 0;
-                    }
-
-                    if (j1i > m_verticalVelocityCountY - 1)
-                    {
-                        j1i = m_verticalVelocityCountY - 1;
-                    }
-
-
-
-                    assert(i1i >= 0);
-                    assert(j1i >= 0);
-                    assert(i0i < m_verticalVelocityCountX);
-                    assert(j0i < m_verticalVelocityCountY);
-
-
-                    int tlIndex = i0i + j0i * m_verticalVelocityCountX;
-                    int trIndex = i1i + j0i * m_verticalVelocityCountX;
-                    int blIndex = i0i + j1i * m_verticalVelocityCountX;
-                    int brIndex = i1i + j1i * m_verticalVelocityCountX;
-
-
-                    targetVerticalVelocity[vIndex] = s0 * (t0 * verticalVelocity[tlIndex] + t1 * verticalVelocity[trIndex])
-                        + s1 * (t0 * verticalVelocity[blIndex] + t1 * verticalVelocity[brIndex]);
-                }*/
-
-
-            //switch (vxType)
-            //{
-            //case Velocity_ZERO:
-            //    velocX[blockIndex] = 0.f;
-            //    break;
-            //case Velocity_FREE:
-            //    break;
-            //case Velocity_LOOPING_RIGHT:
-            //    velocX[blockIndex] += p[blockIndex] - p[blockIndex - 1];
-            //    break;
-            //case Velocity_LOOPING_LEFT:
-            //    velocX[blockIndex] += p[blockIndex] - p[blockIndex - 1 + m_blockCountX];
-            //    break;
-            //default:
-            //    assert(false); // invalid velocity type
-            //}
-        
     }
 }
 
 void FluidBox::SwapVelocityBuffers()
 {
     std::swap(m_activeVelocityBufferIndex, m_inactiveVelocityBufferIndex);
-    //m_activeVelocityBufferIndex = m_inactiveVelocityBufferIndex;
+}
+
+void FluidBox::SwapContentBuffers()
+{
+    std::swap(m_activeContentBufferIndex, m_inactiveContentBufferIndex);
+}
+
+void FluidBox::AdvectContent(float stepDt)
+{
+    // Get max velocity
+    int verticalVelocityCountX = m_verticalVelocityCountX;
+    int horizontalVelocityCountX = m_horizontalVelocityCountX;
+
+    int verticalVelocityCountY = m_verticalVelocityCountY;
+    int horizontalVelocityCountY = m_horizontalVelocityCountY;
+
+    float maxVelocity = 0;
+
+    float* horizontalVelocity = m_horizontalVelocityBuffer[m_activeVelocityBufferIndex];
+    float* verticalVelocity = m_verticalVelocityBuffer[m_activeVelocityBufferIndex];
+
+    
+    for (int vIndex = 0; vIndex < m_verticalVelocityCount; vIndex++)
+    {
+        float vy = abs(verticalVelocity[vIndex]);
+        if (vy > maxVelocity)
+        {
+            maxVelocity = vy;
+        }
+    }
+
+    for (int hIndex = 0; hIndex < m_horizontalVelocityCount; hIndex++)
+    {
+        float vx = abs(horizontalVelocity[hIndex]);
+        if (vx > maxVelocity)
+        {
+            maxVelocity = vx;
+        }
+    }
+
+    float maxDtPerSubStep = 0.5 * m_blockSize / maxVelocity; // TODO check exit velocity sum
+    int subStepCount = int(ceilf(stepDt / maxDtPerSubStep));
+
+    float dt = stepDt / subStepCount;
+
+    
+    int blockCountX = m_blockCountX;
+    int blockCountY = m_blockCountY;
+    float blockSection = m_blockSection;
+    float blockVolume = m_blockVolume;
+    float ooBlockVolume = 1.f / blockVolume;
+
+    auto BIndex = [blockCountX](int bi, int bj) -> int
+    {
+        return (bi + blockCountX) % blockCountX + bj * blockCountX;
+    };
+
+    auto HIndex = [horizontalVelocityCountX](int bi, int bj, int di) -> int
+    {
+        return (bi + di + horizontalVelocityCountX) % horizontalVelocityCountX + bj * horizontalVelocityCountX;
+    };
+
+    auto VIndex = [verticalVelocityCountX](int bi, int bj, int dj) -> int
+    {
+        return (bi + verticalVelocityCountX) % verticalVelocityCountX + (bj + dj) * verticalVelocityCountX;
+    };
+
+
+    for (int k = 0; k < subStepCount; k++)
+    {
+        Content* currentContent = m_contentBuffer[m_activeContentBufferIndex];
+        Content* targetContent = m_contentBuffer[m_inactiveContentBufferIndex];
+
+        memset(targetContent, 0, m_blockCount * sizeof(Content));
+
+        for (int j = 0; j < m_blockCountY; j++)
+        {
+            for (int i = 0; i < m_blockCountX; i++)
+            {
+                int bIndex = BIndex(i, j);
+                Content& currentBlockcontent = currentContent[bIndex];
+
+                int vIndexTop = VIndex(i, j, 0);
+                int vIndexBottom = VIndex(i, j, 1);
+                int vIndexLeft = HIndex(i, j, 0);
+                int vIndexRight = HIndex(i, j, 1);
+
+                float vTop = verticalVelocity[vIndexTop];
+                float vBottom = verticalVelocity[vIndexBottom];
+                float vLeft = horizontalVelocity[vIndexLeft];
+                float vRight = horizontalVelocity[vIndexRight];
+
+                //vTop = 0.f;
+                //vBottom = 0.f;
+                //vLeft = 0.f;
+                //vRight = 40.f;
+
+                bool divTop = vTop < 0;
+                bool divBottom = vBottom > 0;
+                bool divLeft = vLeft < 0;
+                bool divRight = vRight > 0;
+
+
+                float vDivTop = 0.f;
+                float vDivBottom = 0.f;
+                float vDivLeft = 0.f;
+                float vDivRight = 0.f;
+
+
+
+                int divergenceCount = 0;
+                if(divTop)
+                {
+                    vDivTop = -vTop;
+                    divergenceCount++;
+                }
+
+                if (divBottom)
+                {
+                    vDivBottom = vBottom;
+                    divergenceCount++;
+                }
+
+                if (divLeft)
+                {
+                    vDivLeft = -vLeft;
+                    divergenceCount++;
+                }
+
+                if (divRight)
+                {
+                    vDivRight = vRight;
+                    divergenceCount++;
+                }
+
+                bool horizontalDivergence = divLeft && divRight;
+                bool verticalDivergence = divTop && divBottom;
+
+
+
+                if (divergenceCount == 0)
+                {
+                    // 4 direction convergences : no movement
+                    GiveContent(currentBlockcontent, targetContent[bIndex], 1.f, true);
+                }
+                else if (false &&divergenceCount == 2 && !horizontalDivergence && !verticalDivergence)
+                {
+                    // TODO
+                    // Special advect
+                }
+                else
+                {
+                    // 4 direction potential independente divergence : give to 4 neigbourg if div
+
+                   float velocitySum = vDivRight + vDivLeft + vDivBottom + vDivTop;
+                   float movedVolume = velocitySum * dt * blockSection;
+
+                   if (movedVolume > blockVolume)
+                   {
+                       assert(false);
+                   }
+
+                   float stayVolume = blockVolume - movedVolume;
+
+                   GiveContent(currentBlockcontent, targetContent[bIndex], stayVolume * ooBlockVolume, true);
+
+                   if (divTop)
+                   {
+                       assert(BIndex(i, j - 1) >= 0 && BIndex(i, j - 1) < m_blockCount);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j - 1)], vDivTop * dt * blockSection * ooBlockVolume, false);
+                   }
+                   if (divBottom)
+                   {
+                       assert(BIndex(i, j + 1) >= 0 && BIndex(i, j + 1) < m_blockCount);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j + 1)], vBottom * dt * blockSection * ooBlockVolume, false);
+                   }
+                   if (divLeft)
+                   {
+                       assert(BIndex(i - 1, j) >= 0 && BIndex(i - 1, j) < m_blockCount);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i - 1, j)], vDivLeft * dt * blockSection * ooBlockVolume, false);
+                   }
+                   if (divRight)
+                   {
+                       assert(BIndex(i + 1, j) >= 0 && BIndex(i + 1, j) < m_blockCount);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i + 1, j)], vDivRight * dt * blockSection * ooBlockVolume, false);
+                   }
+                }
+            }
+        }
+
+        SwapContentBuffers();
+    }
+
+}
+
+void FluidBox::GiveContent(Content& sourceContent, Content& targetContent, float ratio, bool stay)
+{
+    targetContent.density0 += sourceContent.density0 * ratio;
+    targetContent.density1 += sourceContent.density1 * ratio;
+    targetContent.density2 += sourceContent.density2 * ratio;
 }
 
 //
@@ -1315,16 +1292,15 @@ void FluidBox::SwapVelocityBuffers()
 
 void FluidBox::DecayDensity(float keepRatio)
 {
-    for (int color = 0; color < 3; color++)
-    {
-        float* d = density[color];
-        float* tempsD = tempDensity[color];
 
-        for (int i = 0; i < m_blockCount; i++)
-        {
-            d[i] *= keepRatio;
-            tempsD[i] *= keepRatio;
-        }
+    Content* content = m_contentBuffer[m_activeContentBufferIndex];
+
+    for (int bIndex = 0; bIndex < m_blockCount; bIndex++)
+    {
+        Content& blockContent = content[bIndex];
+        blockContent.density0 *= keepRatio;
+        blockContent.density1 *= keepRatio;
+        blockContent.density2 *= keepRatio;
     }
 }
 

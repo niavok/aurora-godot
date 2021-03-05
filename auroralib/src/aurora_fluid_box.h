@@ -15,6 +15,7 @@ public:
     //void AddVelocity(int x, int y, float amountX, float amountY);
     //void SetVelocity(int x, int y, float amountX, float amountY);
     void SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocity);
+    void AddHorizontalVelocityAtLeft(int blockX, int blockY, float velocity);
     void DecayDensity(float keepRatio);
 
     void Step(float dt, float diff, float visc);
@@ -26,6 +27,7 @@ public:
     
     void CompileGrid();
     
+   
 
     enum BlockEdgeType
     {
@@ -62,16 +64,27 @@ public:
     uint8_t* m_horizontalVelocityType;
     uint8_t* m_verticalVelocityType;
 
-    float* density[3];
+    //float* density[3];
+    struct Content
+    {
+        float density0;
+        float density1;
+        float density2;
+    };
+
+    Content* m_contentBuffer[2];
+
+    void GiveContent(Content& sourceContent, Content& targetContent, float ratio, bool stay);
+
 
     float* m_horizontalVelocityBuffer[2];
     float* m_verticalVelocityBuffer[2];
 
-    float* m_targetHorizontalVelocityWeight;
-    float* m_targetVerticalVelocityWeight;
-
     int m_activeVelocityBufferIndex;
     int m_inactiveVelocityBufferIndex;
+
+    int m_activeContentBufferIndex;
+    int m_inactiveContentBufferIndex;
 
     int m_blockCountX;
     int m_blockCountY;
@@ -82,6 +95,9 @@ public:
     int m_verticalVelocityCountY;
     int m_verticalVelocityCount;
     float m_blockSize;
+    float m_blockDepth;
+    float m_blockSection;
+    float m_blockVolume;
     float m_ooBlockSize;
 
     bool m_isHorizontalLoop;
@@ -94,8 +110,10 @@ private:
     void Project(float* p);
     void Advect(int b, float* d, float* d0, float* velocX, float* velocY, float dt);
     void AdvectVelocity(float dt);
+    void AdvectContent(float dt);
 
     void SwapVelocityBuffers();
+    void SwapContentBuffers();
 
 
     
@@ -109,7 +127,7 @@ private:
 
 
     
-    float* tempDensity[3];
+    //float* tempDensity[3];
     float* p1;
     float* p2;
     float* m_divBuffer;
