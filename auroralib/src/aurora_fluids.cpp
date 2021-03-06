@@ -92,10 +92,21 @@ Fluids::Fluids()
     
 
 
-    drawVSep(100, 15, 85);
+    //drawVSep(100, 15, 85);
 
-    drawVSep(150, 0, 45);
-    drawVSep(150, 55, 100);
+    //drawVSep(150, 0, 45);
+    //drawVSep(150, 55, 100);
+
+    //drawVSep(150, 0, 10);
+
+    for (int i = 0; i < 20; i++)
+    {
+        drawVSep(130 + 39 - i, 50-i/2, 50 + i / 8);
+        drawVSep(130 + i, 50 - i / 2, 50 + i / 8);
+    }
+    //drawVSep(180, 20, 40);
+
+    //drawVSep(210, 0, 10);
 
 
     m_fluidBox->CompileGrid();
@@ -190,6 +201,10 @@ void Fluids::StepWorld(float dt)
     totalDuration += dt;
     static float yO = 0;
 
+    static int stepCount = 0;
+
+
+    stepCount++;
     //yO += 10.f * dt;
 
     if (yO > 20)
@@ -220,20 +235,34 @@ void Fluids::StepWorld(float dt)
         for (int j = 0; j < 100; j++)
         //for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
         {
-            m_fluidBox->AddHorizontalVelocityAtLeft(50, j, 1000.f);
+            //m_fluidBox->AddHorizontalVelocityAtLeft(50, j, 1000.f);
+            for (int i = 0; i < 50; i++)
+            {
+                m_fluidBox->SetHorizontalVelocityAtLeft(5+i, j, 200.f);
+                m_fluidBox->SetVerticalVelocityAtBottom(5 + i, j, 0.f);
+            }
+
+            for (int color = 0; color < 3; color++)
+            {
+                m_fluidBox->SetDensity(0, j, 0.f, color);
+                m_fluidBox->SetDensity(1, j, 0.f, color);
+                m_fluidBox->SetDensity(2, j, 0.f, color);
+                m_fluidBox->SetDensity(3, j, 0.f, color);
+                m_fluidBox->SetDensity(4, j, 0.f, color);
+            }
         }
 
-        for (int j = 20; j < 35; j++)
-            //for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
-        {
-            m_fluidBox->AddHorizontalVelocityAtLeft(230, j, -500.f);
-        }
+        //for (int j = 20; j < 35; j++)
+        //    //for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
+        //{
+        //    m_fluidBox->AddHorizontalVelocityAtLeft(230, j, -500.f);
+        //}
 
         for (int j = 0; j < 20; j++)
         {
             for (int i = 0; i < 10; i++)
             {
-                m_fluidBox->AddDensity(50 + i, 50 + j, 5.0f * dt, 0);
+                //m_fluidBox->AddDensity(50 + i, 50 + j, 5.0f * dt, 0);
                 
                 Vector2 direction(1, yO / 20.f);
 
@@ -246,30 +275,52 @@ void Fluids::StepWorld(float dt)
             }
         }
 
-        for (int j = 0; j < 8; j++)
+        if ((stepCount / 20) % 10 == 0)
         {
-            for (int i = 0; i < 8; i++)
+            int kStep = 10;
+            for (int k = 0; k < m_fluidBox->m_blockCountY - kStep / 2 - 4; k += kStep)
             {
 
-                m_fluidBox->AddDensity(170 + i, 40 + j, 5.0f * dt, 1);
+                for (int j = 0; j < 4; j++)
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        int color = (k / kStep) % 3;
 
-                Vector2 directionB(-1, yB / 10);
-                //Vector2 directionB;
-                //directionB.set_rotation(totalDuration * 5);
-                float velB = 100.f * dt;
-
-                //m_fluidBox->AddVelocity(150 + i, 40 + j, directionB.x * velB, directionB.y * velB);
-
+                        m_fluidBox->AddDensity(10 + i, kStep / 2 + k + j, 50.0f * dt, color);
+                    }
+                }
             }
         }
 
-        for (int j = 0; j < 20; j++)
+
+        if (false)
         {
-            for (int i = 0; i < 8; i++)
+            for (int j = 0; j < 8; j++)
             {
+                for (int i = 0; i < 8; i++)
+                {
 
-                m_fluidBox->AddDensity(120 + i, 80 + j, 5.0f * dt, 2);
+                    m_fluidBox->AddDensity(170 + i, 40 + j, 5.0f * dt, 1);
 
+                    Vector2 directionB(-1, yB / 10);
+                    //Vector2 directionB;
+                    //directionB.set_rotation(totalDuration * 5);
+                    float velB = 100.f * dt;
+
+                    //m_fluidBox->AddVelocity(150 + i, 40 + j, directionB.x * velB, directionB.y * velB);
+
+                }
+            }
+
+            for (int j = 0; j < 20; j++)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+
+                    m_fluidBox->AddDensity(120 + i, 80 + j, 5.0f * dt, 2);
+
+                }
             }
         }
     }

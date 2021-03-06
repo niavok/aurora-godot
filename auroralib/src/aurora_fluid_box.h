@@ -12,9 +12,11 @@ public:
     ~FluidBox();
 
     void AddDensity(int x, int y, float amount, int color);
+    void SetDensity(int x, int y, float amount, int color);
     //void AddVelocity(int x, int y, float amountX, float amountY);
     //void SetVelocity(int x, int y, float amountX, float amountY);
     void SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocity);
+    void SetVerticalVelocityAtBottom(int blockX, int blockY, float velocity);
     void AddHorizontalVelocityAtLeft(int blockX, int blockY, float velocity);
     void DecayDensity(float keepRatio);
 

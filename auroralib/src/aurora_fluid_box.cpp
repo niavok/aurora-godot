@@ -171,6 +171,24 @@ void FluidBox::AddDensity(int x, int y, float amount, int color)
     }
 }
 
+void FluidBox::SetDensity(int x, int y, float amount, int color)
+{
+    Content& content = m_contentBuffer[m_activeContentBufferIndex][x + y * m_blockCountX];
+
+    if (color == 0)
+    {
+        content.density0 = amount;
+    }
+    else if (color == 1)
+    {
+        content.density1 = amount;
+    }
+    else if (color == 2)
+    {
+        content.density2 = amount;
+    }
+}
+
 //void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
 //{
 //    int index = Index(x, y);
@@ -196,6 +214,13 @@ void FluidBox::SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocit
     int velocityIndex = blockX + m_horizontalVelocityCountX * blockY;
     m_horizontalVelocityBuffer[m_activeVelocityBufferIndex][velocityIndex] = velocity;
 }
+
+void FluidBox::SetVerticalVelocityAtBottom(int blockX, int blockY, float velocity)
+{
+    int velocityIndex = blockX + m_verticalVelocityCountX * (blockY + 1);
+    m_verticalVelocityBuffer[m_activeVelocityBufferIndex][velocityIndex] = velocity;
+}
+
 
 void FluidBox::AddHorizontalVelocityAtLeft(int blockX, int blockY, float velocity)
 {
@@ -1138,17 +1163,55 @@ void FluidBox::AdvectContent(float stepDt)
                 bool horizontalDivergence = divLeft && divRight;
                 bool verticalDivergence = divTop && divBottom;
 
+                auto DivDiagonalFill = [&]() -> bool
+                {
+                    int di = divTop ? -1 : 1;
+                    int dj = divLeft ? -1 : 1;
+                    int diagIndex = BIndex(i + di, j + dj);
 
+                    BlockEdgeType type = (BlockEdgeType ) m_blockEdgeType[diagIndex];
+
+                    return type == BlockEdge_FILL;
+                };
 
                 if (divergenceCount == 0)
                 {
                     // 4 direction convergences : no movement
                     GiveContent(currentBlockcontent, targetContent[bIndex], 1.f, true);
                 }
-                else if (false &&divergenceCount == 2 && !horizontalDivergence && !verticalDivergence)
+                else if (divergenceCount == 2 && !horizontalDivergence && !verticalDivergence && !DivDiagonalFill())
                 {
-                    // TODO
-                    // Special advect
+                    float vy = vDivBottom - vDivTop;
+                    float vx = vDivRight - vDivLeft;
+
+                    float dx = vx * dt;
+                    float dy = vy * dt;
+
+                    float x = i + dx * m_ooBlockSize;
+                    float y = j + dy * m_ooBlockSize;
+
+                    float i0 = floorf(x);
+                    float i1 = i0 + 1.0f;
+
+                    float j0 = floorf(y);
+                    float j1 = j0 + 1.0f;
+
+                    float s1 = x - i0;
+                    float s0 = 1.0f - s1;
+                    float t1 = y - j0;
+                    float t0 = 1.0f - t1;
+
+                    int i0i = (int)i0;
+                    int i1i = (int)i1;
+                    int j0i = (int)j0;
+                    int j1i = (int)j1;
+
+                    GiveContent(currentBlockcontent, targetContent[BIndex(i0i, j0i)], s0 * t0, i0i == bIndex);
+                    GiveContent(currentBlockcontent, targetContent[BIndex(i1i, j0i)], s1 * t0, i0i == bIndex);
+                    GiveContent(currentBlockcontent, targetContent[BIndex(i0i, j1i)], s0 * t1, i0i == bIndex);
+                    GiveContent(currentBlockcontent, targetContent[BIndex(i1i, j1i)], s1 * t1, i0i == bIndex);
+
+
                 }
                 else
                 {
