@@ -3,6 +3,7 @@
 #include <Input.hpp>
 #include <Vector2.hpp>
 #include <Vector3.hpp>
+#include <Viewport.hpp>
 
 namespace godot
 {
@@ -101,12 +102,12 @@ Fluids::Fluids()
 
     for (int i = 0; i < 20; i++)
     {
-        drawVSep(130 + 39 - i, 50-i/2, 50 + i / 8);
-        drawVSep(130 + i, 50 - i / 2, 50 + i / 8);
+        //drawVSep(130 + 39 - i, 50-i/2, 50 + i / 2);
+        //drawVSep(130 + i, 50 - i / 2, 50 + i / 2);
     }
     //drawVSep(180, 20, 40);
 
-    //drawVSep(210, 0, 10);
+    //drawVSep(210, 0, 80);
 
 
     m_fluidBox->CompileGrid();
@@ -130,6 +131,28 @@ Fluids::Fluids()
     //    m_fluidBox->blockType[m_fluidBox->Index(251, j)] = 2;
     //}
 
+}
+
+void Fluids::FillTile(bool fill, Vector2 mousePosition)
+{
+
+    Vector2 worldPosition = (mousePosition - RENDER_DEBUG_OFFSET) / RENDER_DEBUG_SCALE;
+
+    float blockSize = m_fluidBox->m_blockSize;
+
+    int i = int(worldPosition.x / blockSize);
+    int j = int(worldPosition.y / blockSize) % m_fluidBox->m_blockCountY;
+
+    if (i < 0 || j < 0 || i >= m_fluidBox->m_blockCountX || j >= m_fluidBox->m_blockCountY)
+    {
+        return;
+    }
+
+    m_fluidBox->m_blockEdgeType[m_fluidBox->BlockIndex(i, j)] = fill ? FluidBox::BlockEdge_FILL : FluidBox::BlockEdge_VOID;
+    m_fluidBox->CompileGrid();
+    m_fluidBox->SetDensity(i, j, 0.f, 0);
+    m_fluidBox->SetDensity(i, j, 0.f, 1);
+    m_fluidBox->SetDensity(i, j, 0.f, 2);
 }
 
 Fluids::~Fluids() {
@@ -182,12 +205,33 @@ void Fluids::_process(float delta)
     if (!m_paused || input->is_action_just_pressed("world_step"))
     {
         StepWorld(m_worldStepDt);
-        update();
+        //update();
     }
         
     if (input->is_action_just_pressed("world_toogle_pause") || input->is_action_just_pressed("world_step"))
     {
         PrintWorldState();
+    }
+
+
+    if (input->is_mouse_button_pressed(1))
+    {
+        Viewport* viewport = get_viewport();
+        Vector2 origin = viewport->get_canvas_transform().get_origin();
+        
+
+        Vector2 mousePosition = get_local_mouse_position() - origin;
+        FillTile(true, mousePosition);
+    }
+
+    if (input->is_mouse_button_pressed(2))
+    {
+        Viewport* viewport = get_viewport();
+        Vector2 origin = viewport->get_canvas_transform().get_origin();
+
+
+        Vector2 mousePosition = get_local_mouse_position() - origin;
+        FillTile(false, mousePosition);
     }
 
     update();
@@ -275,7 +319,7 @@ void Fluids::StepWorld(float dt)
             }
         }
 
-        if ((stepCount / 20) % 10 == 0)
+        if ((stepCount / 2) % 40 == 0)
         {
             int kStep = 10;
             for (int k = 0; k < m_fluidBox->m_blockCountY - kStep / 2 - 4; k += kStep)
@@ -287,7 +331,7 @@ void Fluids::StepWorld(float dt)
                     {
                         int color = (k / kStep) % 3;
 
-                        m_fluidBox->AddDensity(10 + i, kStep / 2 + k + j, 50.0f * dt, color);
+                        m_fluidBox->AddDensity(10 + i, kStep / 2 + k + j, 2000.0f * dt, color);
                     }
                 }
             }

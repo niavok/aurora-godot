@@ -25,6 +25,8 @@ public:
 private:
     void StepWorld(float dt);
     void PrintWorldState();
+    void FillTile(bool fill, Vector2 mousePosition);
+
     
     FluidBox* m_fluidBox;
     bool m_worldEnableSun = true;

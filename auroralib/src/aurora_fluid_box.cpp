@@ -23,8 +23,8 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
     , m_blockVolume(m_blockSize* m_blockSize* m_blockDepth)
     , m_ooBlockSize(1.f / blockSize)
     , m_diffuseMaxIter(100)
-    , m_viscosityMaxIter(100)
-    , m_projectMaxIter(200)
+    , m_viscosityMaxIter(10)
+    , m_projectMaxIter(20)
     , m_diffuseQualityThresold(1e-5f)
     , m_viscosityQualityThresold(1e-5f)
     , m_projectQualityThresold(0.1f)
@@ -387,6 +387,7 @@ void FluidBox::Step(float dt, float diff, float visc)
     Advect(2, Vy, Vy0, Vx0, Vy0, dt);
 #endif
 
+    ComputeViscosity(visc, dt);
     
     Project(p1);
     
@@ -414,6 +415,134 @@ void FluidBox::Diffuse(int b, float* x, float* x0, float diff, float dt, int max
     float a = dt * diff / m_blockSize /** m_blockSize*/;
     //LinearSolve(b, x, x0, a, 1 + 4 * a, maxIter, qualityThresold);
 }
+
+void FluidBox::ComputeViscosity(float visc, float dt)
+{
+    float* horizontalVelocity = m_horizontalVelocityBuffer[m_activeVelocityBufferIndex];
+    float* verticalVelocity = m_verticalVelocityBuffer[m_activeVelocityBufferIndex];
+
+    float* targetHorizontalVelocity = m_horizontalVelocityBuffer[m_inactiveVelocityBufferIndex];
+    float* targetVerticalVelocity = m_verticalVelocityBuffer[m_inactiveVelocityBufferIndex];
+
+    // Copy velocity in target buffer
+    memcpy(targetHorizontalVelocity, horizontalVelocity, sizeof(float) * m_horizontalVelocityCount);
+    memcpy(targetVerticalVelocity, verticalVelocity, sizeof(float) * m_verticalVelocityCount);
+    
+    int horizontalVelocityCountX = m_horizontalVelocityCountX;
+    int verticalVelocityCountX = m_verticalVelocityCountX;
+
+    float a = dt * visc / m_blockSize /** m_blockSize*/;
+    float c4 = 1 + 4 * a;
+    float ooC4 = 1.f / c4;
+
+    float c3 = 1 + 3 * a;
+    float ooC3 = 1.f / c3;
+
+    auto HIndex = [horizontalVelocityCountX](int hi, int hj) -> int
+    {
+        return (hi + horizontalVelocityCountX) % horizontalVelocityCountX + hj * horizontalVelocityCountX;
+    };
+
+    auto VIndex = [verticalVelocityCountX](int vi, int vj) -> int
+    {
+        return (vi + verticalVelocityCountX) % verticalVelocityCountX + vj * verticalVelocityCountX;
+    };
+
+    // linear solve for x
+    for (int k = 0; k < m_viscosityMaxIter; k++) {
+        float maxCorrection = 0;
+        for (int j = 0; j < m_horizontalVelocityCountY; j++) {
+            for (int i = 0; i < horizontalVelocityCountX; i++) {
+
+                int vIndex = HIndex(i, j);
+
+                VelocityType vType = (VelocityType) m_horizontalVelocityType[vIndex];
+                if (vType == Velocity_ZERO)
+                {
+                    targetHorizontalVelocity[vIndex] = 0.f;
+                }
+                else if (j == 0)
+                {
+                    float newV = (horizontalVelocity[vIndex]
+                        + a * (targetHorizontalVelocity[HIndex(i + 1, j)] + targetHorizontalVelocity[HIndex(i - 1, j)] + targetHorizontalVelocity[HIndex(i, j + 1)])
+                        ) * ooC3;
+                    float correction = abs(newV - targetHorizontalVelocity[vIndex]);
+                    if (maxCorrection < correction)
+                    {
+                        maxCorrection = correction;
+                    }
+                    targetHorizontalVelocity[vIndex] = newV;
+                }
+                else if (j == m_horizontalVelocityCountY -1)
+                {
+                    float newV = (horizontalVelocity[vIndex]
+                        + a * (targetHorizontalVelocity[HIndex(i + 1, j)] + targetHorizontalVelocity[HIndex(i - 1, j)] + targetHorizontalVelocity[HIndex(i, j - 1)])
+                        ) * ooC3;
+                    float correction = abs(newV - targetHorizontalVelocity[vIndex]);
+                    if (maxCorrection < correction)
+                    {
+                        maxCorrection = correction;
+                    }
+                    targetHorizontalVelocity[vIndex] = newV;
+                }
+                else
+                {
+                    float newV = (horizontalVelocity[vIndex]
+                        + a * (targetHorizontalVelocity[HIndex(i + 1, j)] + targetHorizontalVelocity[HIndex(i - 1, j)] + targetHorizontalVelocity[HIndex(i, j + 1)] + targetHorizontalVelocity[HIndex(i, j - 1)])
+                        ) * ooC4;
+                    float correction = abs(newV - targetHorizontalVelocity[vIndex]);
+                    if (maxCorrection < correction)
+                    {
+                        maxCorrection = correction;
+                    }
+                    targetHorizontalVelocity[vIndex] = newV;
+                }
+            }
+        }
+        
+        if (maxCorrection <= m_viscosityQualityThresold)
+        {
+            break;
+        }
+    }
+
+    // linear solve for y
+    for (int k = 0; k < m_viscosityMaxIter; k++) {
+        float maxCorrection = 0;
+        for (int j = 0; j < m_verticalVelocityCountY; j++) {
+            for (int i = 0; i < m_verticalVelocityCountX; i++) {
+
+                int vIndex = VIndex(i, j);
+
+                VelocityType vType = (VelocityType)m_verticalVelocityType[vIndex];
+                if (vType == Velocity_ZERO)
+                {
+                    targetVerticalVelocity[vIndex] = 0.f;
+                }
+                else
+                {
+                    float newV = (verticalVelocity[vIndex]
+                        + a * (targetVerticalVelocity[VIndex(i + 1, j)] + targetVerticalVelocity[VIndex(i - 1, j)] + targetVerticalVelocity[VIndex(i, j + 1)] + targetVerticalVelocity[VIndex(i, j - 1)])
+                        ) * ooC4;
+                    float correction = abs(newV - targetVerticalVelocity[vIndex]);
+                    if (maxCorrection < correction)
+                    {
+                        maxCorrection = correction;
+                    }
+                    targetVerticalVelocity[vIndex] = newV;
+                }
+            }
+        }
+
+        if (maxCorrection <= m_viscosityQualityThresold)
+        {
+            break;
+        }
+    }
+
+    SwapVelocityBuffers();
+}
+
 
 void FluidBox::Project(float* p)
 {

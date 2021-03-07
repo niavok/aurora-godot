@@ -114,6 +114,8 @@ private:
     void AdvectVelocity(float dt);
     void AdvectContent(float dt);
 
+    void ComputeViscosity(float visc, float dt);
+
     void SwapVelocityBuffers();
     void SwapContentBuffers();
 
