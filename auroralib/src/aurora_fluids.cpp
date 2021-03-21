@@ -150,9 +150,7 @@ void Fluids::FillTile(bool fill, Vector2 mousePosition)
 
     m_fluidBox->m_blockEdgeType[m_fluidBox->BlockIndex(i, j)] = fill ? FluidBox::BlockEdge_FILL : FluidBox::BlockEdge_VOID;
     m_fluidBox->CompileGrid();
-    m_fluidBox->SetDensity(i, j, 0.f, 0);
-    m_fluidBox->SetDensity(i, j, 0.f, 1);
-    m_fluidBox->SetDensity(i, j, 0.f, 2);
+    m_fluidBox->SetContent(i, j, 0.f, 0.f, 0.f);
 }
 
 Fluids::~Fluids() {
@@ -286,13 +284,9 @@ void Fluids::StepWorld(float dt)
                 m_fluidBox->SetVerticalVelocityAtBottom(5 + i, j, 0.f);
             }
 
-            for (int color = 0; color < 3; color++)
+            for (int xOffset = 0; xOffset < 5; xOffset++)
             {
-                m_fluidBox->SetDensity(0, j, 0.f, color);
-                m_fluidBox->SetDensity(1, j, 0.f, color);
-                m_fluidBox->SetDensity(2, j, 0.f, color);
-                m_fluidBox->SetDensity(3, j, 0.f, color);
-                m_fluidBox->SetDensity(4, j, 0.f, color);
+                m_fluidBox->SetContent(xOffset, j, 0.f, 0.f, 0.f);
             }
         }
 
@@ -701,7 +695,7 @@ void Fluids::_draw()
 
                 FluidBox::Content& blockContent = content[index];
 
-                Vector3 composition(blockContent.density0, blockContent.density1, blockContent.density2);
+                Vector3 composition(blockContent.totalContent.density0, blockContent.totalContent.density1, blockContent.totalContent.density2);
 
                 float density = composition.x + composition.y + composition.z;
 

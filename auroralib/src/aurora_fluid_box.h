@@ -12,7 +12,7 @@ public:
     ~FluidBox();
 
     void AddDensity(int x, int y, float amount, int color);
-    void SetDensity(int x, int y, float amount, int color);
+    void SetContent(int x, int y, float amount0, float amount1, float amount2);
     //void AddVelocity(int x, int y, float amountX, float amountY);
     //void SetVelocity(int x, int y, float amountX, float amountY);
     void SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocity);
@@ -29,7 +29,6 @@ public:
     
     void CompileGrid();
     
-   
 
     enum BlockEdgeType
     {
@@ -67,16 +66,36 @@ public:
     uint8_t* m_verticalVelocityType;
 
     //float* density[3];
-    struct Content
+
+    struct SubContent
     {
+        float N;
         float density0;
         float density1;
         float density2;
     };
 
+
+    struct Content
+    {
+        uint8_t inputBufferId;
+        bool requestSwapBuffer;
+        SubContent subContent[2];
+        SubContent totalContent;
+        float outputContentRatio;
+      
+        SubContent& GetInputSubContent();
+        SubContent& GetOutputSubContent();
+        void UpdateCache();
+    };
+
     Content* m_contentBuffer[2];
 
-    void GiveContent(Content& sourceContent, Content& targetContent, float ratio, bool stay);
+    Content& GetActiveBlockContent(int bIndex);
+
+
+    void GiveContent(Content& sourceContent, Content& targetContent, float ratio, float totalMovingRatio, bool stay);
+    void GiveSubContent(SubContent& sourceSubContent, SubContent& targetSubContent, float ratio);
 
 
     float* m_horizontalVelocityBuffer[2];

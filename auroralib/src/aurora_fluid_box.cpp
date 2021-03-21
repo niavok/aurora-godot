@@ -23,8 +23,8 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
     , m_blockVolume(m_blockSize* m_blockSize* m_blockDepth)
     , m_ooBlockSize(1.f / blockSize)
     , m_diffuseMaxIter(100)
-    , m_viscosityMaxIter(10)
-    , m_projectMaxIter(20)
+    , m_viscosityMaxIter(20)
+    , m_projectMaxIter(200)
     , m_diffuseQualityThresold(1e-5f)
     , m_viscosityQualityThresold(1e-5f)
     , m_projectQualityThresold(0.1f)
@@ -115,6 +115,16 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
 
         m_blockEdgeType[i] = BlockEdge_VOID;
         m_divBuffer[i] = 0;
+
+        
+    }
+
+    for (int j = 0; j < m_blockCountY; j++)
+    {
+        for (int i = 0; i < m_blockCountX; i++)
+        {
+            SetContent(i, j, 0.f, 0.f, 0.f);
+        }
     }
 }
 
@@ -155,38 +165,49 @@ int FluidBox::BlockIndex(int x, int y)
 
 void FluidBox::AddDensity(int x, int y, float amount, int color)
 {
-    Content& content = m_contentBuffer[m_activeContentBufferIndex][x + y * m_blockCountX];
+    Content& content = GetActiveBlockContent(x + y * m_blockCountX);
+
+    SubContent& inputSubContent = content.GetInputSubContent();
 
     if (color == 0)
     {
-        content.density0 += amount;
+        inputSubContent.density0 += amount;
     }
     else if (color == 1)
     {
-        content.density1 += amount;
+        inputSubContent.density1 += amount;
     }
     else if (color == 2)
     {
-        content.density2 += amount;
+        inputSubContent.density2 += amount;
     }
 }
 
-void FluidBox::SetDensity(int x, int y, float amount, int color)
+FluidBox::Content& FluidBox::GetActiveBlockContent(int bIndex)
 {
-    Content& content = m_contentBuffer[m_activeContentBufferIndex][x + y * m_blockCountX];
+    return m_contentBuffer[m_activeContentBufferIndex][bIndex];
+}
 
-    if (color == 0)
-    {
-        content.density0 = amount;
-    }
-    else if (color == 1)
-    {
-        content.density1 = amount;
-    }
-    else if (color == 2)
-    {
-        content.density2 = amount;
-    }
+void FluidBox::SetContent(int x, int y, float amount0, float amount1, float amount2)
+{
+    Content& content = GetActiveBlockContent(x + y * m_blockCountX);
+
+    SubContent& inputSubContent = content.GetInputSubContent();
+    SubContent& outputSubContent = content.GetOutputSubContent();
+
+    inputSubContent.N = 1;
+    outputSubContent.N = 0;
+
+    inputSubContent.density0 = amount0;
+    outputSubContent.density0 = 0;
+
+    inputSubContent.density1 = amount1;
+    outputSubContent.density1 = 0;
+
+    inputSubContent.density2 += amount2;
+    outputSubContent.density2 = 0;
+
+    content.UpdateCache();
 }
 
 //void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
@@ -1159,7 +1180,51 @@ void FluidBox::SwapVelocityBuffers()
 void FluidBox::SwapContentBuffers()
 {
     std::swap(m_activeContentBufferIndex, m_inactiveContentBufferIndex);
+
+    Content* activeContentBuffer = m_contentBuffer[m_activeContentBufferIndex];
+
+    // Compute cache
+    for (int bIndex = 0; bIndex < m_blockCount; bIndex++)
+    {
+        Content &blockContent = activeContentBuffer[bIndex];
+        blockContent.UpdateCache();    
+    }
 }
+
+FluidBox::SubContent& FluidBox::Content::GetInputSubContent()
+{
+    return subContent[inputBufferId];
+}
+
+FluidBox::SubContent& FluidBox::Content::GetOutputSubContent()
+{
+    return subContent[(inputBufferId+1) & 0x1];
+}
+
+void FluidBox::Content::UpdateCache()
+{
+    if (requestSwapBuffer)
+    {
+        inputBufferId = (inputBufferId + 1) & 0x1;
+        requestSwapBuffer = false;
+    }
+
+    SubContent& inputSubContent = subContent[inputBufferId];
+    SubContent& outputSubContent = subContent[(inputBufferId + 1) & 0x1];
+
+    float inputN = inputSubContent.N;
+    float outputN = outputSubContent.N;
+
+    totalContent.N = inputN + outputN;
+    totalContent.density0 = inputSubContent.density0 + outputSubContent.density0;
+    totalContent.density1 = inputSubContent.density1 + outputSubContent.density1;
+    totalContent.density2 = inputSubContent.density2 + outputSubContent.density2;
+
+    outputContentRatio = outputN / (inputN + outputN);
+    assert(!isnan(outputContentRatio));
+}
+
+
 
 void FluidBox::AdvectContent(float stepDt)
 {
@@ -1194,7 +1259,7 @@ void FluidBox::AdvectContent(float stepDt)
         }
     }
 
-    float maxDtPerSubStep = 0.5 * m_blockSize / maxVelocity; // TODO check exit velocity sum
+    float maxDtPerSubStep = 0.5f * m_blockSize / maxVelocity; // TODO check exit velocity sum
     int subStepCount = int(ceilf(stepDt / maxDtPerSubStep));
 
     float dt = stepDt / subStepCount;
@@ -1263,6 +1328,10 @@ void FluidBox::AdvectContent(float stepDt)
                 float vDivRight = 0.f;
 
 
+                if (bIndex == 6)
+                {
+                    int plop = 1;
+                }
 
                 int divergenceCount = 0;
                 if(divTop)
@@ -1306,7 +1375,7 @@ void FluidBox::AdvectContent(float stepDt)
                 if (divergenceCount == 0)
                 {
                     // 4 direction convergences : no movement
-                    GiveContent(currentBlockcontent, targetContent[bIndex], 1.f, true);
+                    GiveContent(currentBlockcontent, targetContent[bIndex], 1.f, 0.f, true);
                 }
                 else if (divergenceCount == 2 && !horizontalDivergence && !verticalDivergence && !DivDiagonalFill())
                 {
@@ -1335,12 +1404,21 @@ void FluidBox::AdvectContent(float stepDt)
                     int j0i = (int)j0;
                     int j1i = (int)j1;
 
-                    GiveContent(currentBlockcontent, targetContent[BIndex(i0i, j0i)], s0 * t0, i0i == bIndex);
-                    GiveContent(currentBlockcontent, targetContent[BIndex(i1i, j0i)], s1 * t0, i0i == bIndex);
-                    GiveContent(currentBlockcontent, targetContent[BIndex(i0i, j1i)], s0 * t1, i0i == bIndex);
-                    GiveContent(currentBlockcontent, targetContent[BIndex(i1i, j1i)], s1 * t1, i0i == bIndex);
+                    int tlBindex = BIndex(i0i, j0i);
+                    int trBindex = BIndex(i1i, j0i);
+                    int blBindex = BIndex(i0i, j1i);
+                    int brBindex = BIndex(i1i, j1i);
 
+                    float totalMovingRatio = 1.f
+                        - (tlBindex == bIndex ? s0 * t0 : 0.f)
+                        - (trBindex == bIndex ? s1 * t0 : 0.f)
+                        - (blBindex == bIndex ? s0 * t1 : 0.f)
+                        - (brBindex == bIndex ? s1 * t1 : 0.f);
 
+                    GiveContent(currentBlockcontent, targetContent[tlBindex], s0 * t0, totalMovingRatio, tlBindex == bIndex);
+                    GiveContent(currentBlockcontent, targetContent[trBindex], s1 * t0, totalMovingRatio, trBindex == bIndex);
+                    GiveContent(currentBlockcontent, targetContent[blBindex], s0 * t1, totalMovingRatio, blBindex == bIndex);
+                    GiveContent(currentBlockcontent, targetContent[brBindex], s1 * t1, totalMovingRatio, brBindex == bIndex);
                 }
                 else
                 {
@@ -1356,27 +1434,30 @@ void FluidBox::AdvectContent(float stepDt)
 
                    float stayVolume = blockVolume - movedVolume;
 
-                   GiveContent(currentBlockcontent, targetContent[bIndex], stayVolume * ooBlockVolume, true);
+                   float stayRatio = stayVolume * ooBlockVolume;
+                   float totalMovingRatio = 1.f - stayVolume * ooBlockVolume;
+
+                   GiveContent(currentBlockcontent, targetContent[bIndex], stayRatio, totalMovingRatio, true);
 
                    if (divTop)
                    {
                        assert(BIndex(i, j - 1) >= 0 && BIndex(i, j - 1) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j - 1)], vDivTop * dt * blockSection * ooBlockVolume, false);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j - 1)], vDivTop * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
                    }
                    if (divBottom)
                    {
                        assert(BIndex(i, j + 1) >= 0 && BIndex(i, j + 1) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j + 1)], vBottom * dt * blockSection * ooBlockVolume, false);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j + 1)], vBottom * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
                    }
                    if (divLeft)
                    {
                        assert(BIndex(i - 1, j) >= 0 && BIndex(i - 1, j) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i - 1, j)], vDivLeft * dt * blockSection * ooBlockVolume, false);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i - 1, j)], vDivLeft * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
                    }
                    if (divRight)
                    {
                        assert(BIndex(i + 1, j) >= 0 && BIndex(i + 1, j) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i + 1, j)], vDivRight * dt * blockSection * ooBlockVolume, false);
+                       GiveContent(currentBlockcontent, targetContent[BIndex(i + 1, j)], vDivRight * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
                    }
                 }
             }
@@ -1387,11 +1468,77 @@ void FluidBox::AdvectContent(float stepDt)
 
 }
 
-void FluidBox::GiveContent(Content& sourceContent, Content& targetContent, float ratio, bool stay)
+void FluidBox::GiveSubContent(SubContent& sourceSubContent, SubContent& targetSubContent, float ratio)
 {
-    targetContent.density0 += sourceContent.density0 * ratio;
-    targetContent.density1 += sourceContent.density1 * ratio;
-    targetContent.density2 += sourceContent.density2 * ratio;
+    targetSubContent.N += sourceSubContent.N * ratio;
+    targetSubContent.density0 += sourceSubContent.density0 * ratio;
+    targetSubContent.density1 += sourceSubContent.density1 * ratio;
+    targetSubContent.density2 += sourceSubContent.density2 * ratio;
+    assert(!isnan(targetSubContent.N));
+}
+
+void FluidBox::GiveContent(Content& sourceContent, Content& targetContent, float ratio, float totalMovingRatio, bool stay)
+{
+    if (ratio == 0.f)
+    {
+        return;
+    }
+
+    if (stay)
+    {
+        float totalStayRatio = 1.f - totalMovingRatio;
+        float inputContentRatio = 1.f - sourceContent.outputContentRatio;
+
+        assert(std::abs(ratio - totalStayRatio) < 1e-5);
+
+        if (inputContentRatio > totalStayRatio)
+        {
+            // Take all from input buffer to target input buffer
+            float ratioToTakeFromInput = ratio / inputContentRatio;
+            GiveSubContent(sourceContent.subContent[sourceContent.inputBufferId], targetContent.subContent[targetContent.inputBufferId], ratioToTakeFromInput);
+        }
+        else
+        {
+            // Copy input
+            float inputRatio = 1.f;
+            GiveSubContent(sourceContent.subContent[sourceContent.inputBufferId], targetContent.subContent[targetContent.inputBufferId], inputRatio);
+
+
+            float alreadyTaken = inputContentRatio;
+            float remainingToTake = ratio - alreadyTaken;
+            if (remainingToTake != 0.f)
+            {
+                float outputRatio = remainingToTake / sourceContent.outputContentRatio;
+                assert(!isnan(outputRatio));
+
+                GiveSubContent(sourceContent.subContent[(sourceContent.inputBufferId + 1) & 0x1], targetContent.subContent[targetContent.inputBufferId], outputRatio);
+            }
+        }
+    }
+    else
+    {
+        if (sourceContent.outputContentRatio > totalMovingRatio)
+        {
+            // Take all from ouput buffer to target input buffer
+            float ratioToTakeFromOutput = ratio / sourceContent.outputContentRatio;
+            GiveSubContent(sourceContent.subContent[(sourceContent.inputBufferId + 1) & 0x1], targetContent.subContent[targetContent.inputBufferId],ratioToTakeFromOutput);
+        }
+        else
+        {
+            // Take a part of the the output
+            float outputRatio = ratio / totalMovingRatio;
+            targetContent.requestSwapBuffer = true;
+            GiveSubContent(sourceContent.subContent[(sourceContent.inputBufferId + 1) & 0x1], targetContent.subContent[targetContent.inputBufferId], outputRatio);
+
+            // Take the rest on the input
+
+            float alreadyTaken = outputRatio * sourceContent.outputContentRatio;
+            float remainingToTake = ratio - alreadyTaken;
+
+            float inputRatio = remainingToTake / (1.f - sourceContent.outputContentRatio);
+            GiveSubContent(sourceContent.subContent[sourceContent.inputBufferId], targetContent.subContent[targetContent.inputBufferId], inputRatio);
+        }
+    }
 }
 
 //
@@ -1490,9 +1637,16 @@ void FluidBox::DecayDensity(float keepRatio)
     for (int bIndex = 0; bIndex < m_blockCount; bIndex++)
     {
         Content& blockContent = content[bIndex];
-        blockContent.density0 *= keepRatio;
-        blockContent.density1 *= keepRatio;
-        blockContent.density2 *= keepRatio;
+
+        SubContent& inputSubContent = blockContent.GetInputSubContent();
+        SubContent& outputSubContent = blockContent.GetInputSubContent();
+
+        inputSubContent.density0 *= keepRatio;
+        inputSubContent.density1 *= keepRatio;
+        inputSubContent.density2 *= keepRatio;
+        outputSubContent.density0 *= keepRatio;
+        outputSubContent.density1 *= keepRatio;
+        outputSubContent.density2 *= keepRatio;
     }
 }
 

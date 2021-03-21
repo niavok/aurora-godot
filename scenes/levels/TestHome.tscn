@@ -103,7 +103,7 @@ polygon = PoolVector2Array( -2835.94, -417.499, -2301.97, -561.585, -1653.58, -6
 position = Vector2( -2740.18, -247.391 )
 script = ExtResource( 4 )
 diffusion_coef = 0.001
-viscosity_coef = 0.0
+viscosity_coef = 0.01
 RENDER_DEBUG_SCALE = 0.033
 RENDER_DEBUG_VELOCITY_SCALE = 3.0
 m_worldStepDt = 1.0
@@ -120,10 +120,10 @@ motion_scale = Vector2( 0.3, 0.3 )
 
 [node name="ColorRect" type="ColorRect" parent="Background/ParallaxBackground/ParallaxLayer"]
 modulate = Color( 0.0705882, 0.0627451, 0.0627451, 1 )
-margin_left = -3162.32
-margin_top = -2132.41
-margin_right = 2857.68
-margin_bottom = 960.59
+margin_left = -3158.76
+margin_top = -2139.54
+margin_right = 2861.24
+margin_bottom = 953.463
 color = Color( 0.509804, 0.647059, 0.592157, 1 )
 __meta__ = {
 "_edit_use_anchors_": false
