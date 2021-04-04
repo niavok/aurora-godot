@@ -14,7 +14,6 @@ namespace godot
 {
 
 FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHorizontalLoop)
-//: m_blockCountXMask(0)
     : m_blockCountX(blockCountX)
     , m_blockCountY(blockCountY)
     , m_blockSize(blockSize)
@@ -99,7 +98,9 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
     p2 = new float[m_blockCount];
     m_divBuffer = new float[m_blockCount];
 
-    m_blockEdgeType = new uint8_t[m_blockCount];
+    m_blockConfig.resize(m_blockCount);
+
+    ///m_blockEdgeType = new uint8_t[m_blockCount];
 
 
     for (int i = 0; i < m_blockCount; i++)
@@ -113,10 +114,10 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
         p1[i] = 0.f;
         p2[i] = 0.f;
 
-        m_blockEdgeType[i] = BlockEdge_VOID;
+        //m_blockEdgeType[i] = BlockEdge_VOID;
         m_divBuffer[i] = 0;
 
-        
+        m_blockConfig[i].Init();
     }
 
     for (int j = 0; j < m_blockCountY; j++)
@@ -126,6 +127,30 @@ FluidBox::FluidBox(int blockCountX, int blockCountY, float blockSize, bool isHor
             SetContent(i, j, 0.f, 0.f, 0.f);
         }
     }
+}
+
+void FluidBox::BlockConfig::Init()
+{
+    isFill = 0;
+    isLeftConnected = 0;
+    isRightConnected = 0;
+    isTopConnected = 0;
+    isBottomConnected = 0;
+
+    leftBlockIndex = -1;
+    rightBlockIndex = -1;
+    topBlockIndex = -1;
+    bottomBlockIndex = -1;
+
+    topLeftBlockIndex = -1;
+    topRightBlockIndex = -1;
+    bottomLeftBlockIndex = -1;
+    bottomRightBlockIndex = -1;
+
+    leftVelocityIndex = -1;
+    rightVelocityIndex = -1;
+    topVelocityIndex = -1;
+    bottomVelocityIndex = -1;
 }
 
 FluidBox::~FluidBox()
@@ -150,7 +175,7 @@ FluidBox::~FluidBox()
     delete[] p2;
     delete[] m_divBuffer;
 
-    delete[] m_blockEdgeType;
+    //delete[] m_blockEdgeType;
 }
 
 int FluidBox::BlockIndex(int x, int y)
@@ -210,26 +235,6 @@ void FluidBox::SetContent(int x, int y, float amount0, float amount1, float amou
     content.UpdateCache();
 }
 
-//void FluidBox::AddVelocity(int x, int y, float amountX, float amountY)
-//{
-//    int index = Index(x, y);
-//
-//    Vx[index] += amountX;
-//    Vy[index] += amountY;
-//    Vx0[index] += amountX;
-//    Vy0[index] += amountY;
-//}
-//
-//void FluidBox::SetVelocity(int x, int y, float amountX, float amountY)
-//{
-//    int index = Index(x, y);
-//
-//    Vx[index] = amountX;
-//    Vy[index] = amountY;
-//    Vx0[index] = amountX;
-//    Vy0[index] = amountY;
-//}
-
 void FluidBox::SetHorizontalVelocityAtLeft(int blockX, int blockY, float velocity)
 {
     int velocityIndex = blockX + m_horizontalVelocityCountX * blockY;
@@ -248,147 +253,6 @@ void FluidBox::AddHorizontalVelocityAtLeft(int blockX, int blockY, float velocit
     int velocityIndex = blockX + m_horizontalVelocityCountX * blockY;
     m_horizontalVelocityBuffer[m_activeVelocityBufferIndex][velocityIndex] += velocity;
 }
-
-//
-//void FluidBox::SetBound(int b, float* x)
-//{
-//    if (m_isHorizontalLoop)
-//    {
-//        for (int i = 0; i < m_blockCountX; i++) {
-//            //x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
-//            //x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
-//            //x[Index(i, 0)] = b == 2 ? 0 : x[Index(i, 1)];
-//            //x[Index(i, m_blockCountY - 1)] = b == 2 ? 0 : x[Index(i, m_blockCountY - 2)];
-//
-//            x[Index(i, 0)] = b == 0 ? x[Index(i, 1)] : 0;
-//            x[Index(i, m_blockCountY - 1)] = b == 0 ? x[Index(i, m_blockCountY - 2)] : 0;
-//
-//            //x[Index(i, 0)] = 0;
-//            //x[Index(i, m_blockCountY-1)] = 0;
-//        }
-//
-//        //for (int j = 30; j < 90; j++)
-//        //{
-//        //    int i = 100;
-//
-//        //    //x[Index(i, j)] = b == 0 ? x[Index(i-1, j)] + x[Index(i+1, j)] + x[Index(i, j-1)] + x[Index(i, j+1)] : 0;
-//        //    x[Index(i, j)] = b == 0 ? x[Index(i - 1, j)] : 0;
-//        //    x[Index(i+1, j)] = b == 0 ? x[Index(i+2, j)] : 0;
-//        //}
-//
-//    }
-//    else
-//    {
-//        for (int i = 1; i < m_blockCountX - 1; i++) {
-//            x[Index(i, 0)] = b == 2 ? -x[Index(i, 1)] : x[Index(i, 1)];
-//            x[Index(i, m_blockCountY - 1)] = b == 2 ? -x[Index(i, m_blockCountY - 2)] : x[Index(i, m_blockCountY - 2)];
-//        }
-//
-//        for (int j = 1; j < m_blockCountY - 1; j++) {
-//            x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
-//            x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
-//        }
-//
-//
-//        x[Index(0, 0)] = 0.5f * (x[Index(1, 0)] + x[Index(0, 1)]);
-//        x[Index(0, m_blockCountY - 1)] = 0.5f * (x[Index(1, m_blockCountY - 1)] + x[Index(0, m_blockCountY - 2)]);
-//        x[Index(m_blockCountX - 1, 0)] = 0.5f * (x[Index(m_blockCountX - 2, 0)] + x[Index(m_blockCountX - 1, 1)]);
-//        x[Index(m_blockCountX - 1, m_blockCountY - 1)] = 0.5f * (x[Index(m_blockCountX - 2, m_blockCountY - 1)] + x[Index(m_blockCountX - 1, m_blockCountY - 2)]);
-//    }
-//}
-//
-//int FluidBox::LinearSolve(int b, float* x, float* x0, float a, float c, int maxIter, float qualityThresold)
-//{
-//    float cRecip = 1.0f / c;
-//
-//    int k = 0;
-//
-//    if (m_isHorizontalLoop)
-//    {
-//        for (k = 0; k < maxIter; k++) {
-//            float maxCorrection = 0;
-//            for (int j = 1; j < m_blockCountY - 1; j++) {
-//                for (int i = 0; i < m_blockCountX; i++) {
-//
-//                    uint8_t type = blockEdgeType[Index(i, j)];
-//                    if (type != 0)
-//                    {
-//                        //x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
-//                        //x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
-//
-//                        if (type == 1)
-//                        {
-//                            // Left border
-//                            //x[Index(i, j)] = x[Index(i-1, j)];
-//                            x[Index(i, j)] = b == 1 ? -x[Index(i - 1, j)] : x[Index(i - 1, j)];
-//                        }
-//                        else if (type == 2)
-//                        {
-//                            x[Index(i, j)] = b == 1 ? -x[Index(i + 1, j)] : x[Index(i + 1, j)];
-//                            //x[Index(i, j)] = -x[Index(i + 1, j)];
-//                        }
-//
-//
-//                        //x[Index(i, j)] = 0;
-//                        /*if(b==0)
-//                        x[Index(i, 0)] = b == 0 ? x[Index(i, 1)] : 0;
-//                        x[Index(i, m_blockCountY - 1)] = b == 0 ? x[Index(i, m_blockCountY - 2)] : 0;*/
-//                    }
-//                    else
-//                    {
-//
-//                        float newX = (x0[Index(i, j)]
-//                            + a * (x[IndexLoop(i + 1, j)] + x[IndexLoop(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
-//                            ) * cRecip;
-//                        float correction = abs(newX - x[Index(i, j)]);
-//                        if (maxCorrection < correction)
-//                        {
-//                            maxCorrection = correction;
-//                        }
-//                        x[Index(i, j)] = newX;
-//                    }
-//                }
-//            }
-//
-//            SetBound(b, x);
-//
-//            if (maxCorrection <= qualityThresold)
-//            {
-//                break;
-//            }
-//        }
-//    }
-//    else
-//    {
-//        for (k = 0; k < maxIter; k++) {
-//            float maxCorrection = 0;
-//            for (int j = 1; j < m_blockCountY - 1; j++) {
-//                for (int i = 1; i < m_blockCountX - 1; i++) {
-//                    float newX =
-//                        (x0[Index(i, j)]
-//                            + a * (x[Index(i + 1, j)] + x[Index(i - 1, j)] + x[Index(i, j + 1)] + x[Index(i, j - 1)])
-//                            ) * cRecip;
-//                    float correction = abs(newX - x[Index(i, j)]);
-//                    if (maxCorrection < correction)
-//                    {
-//                        maxCorrection = correction;
-//                    }
-//                    x[Index(i, j)] = newX;
-//                }
-//            }
-//
-//            SetBound(b, x);
-//
-//
-//            if (maxCorrection <= qualityThresold)
-//            {
-//                break;
-//            }
-//        }
-//    }
-//
-//    return k;
-//}
 
 void FluidBox::Step(float dt, float diff, float visc)
 {
@@ -574,26 +438,6 @@ void FluidBox::Project(float* p)
     int horizontalVelocityCountX = m_horizontalVelocityCountX;
     int verticalVelocityCountX = m_verticalVelocityCountX;
 
-    auto LeftHorizontalVelocity = [horizontalVelocityCountX, horizontalVelocity](int blockX, int blockY) -> float {
-        int velocityIndex = blockX + horizontalVelocityCountX * blockY;
-        return horizontalVelocity[velocityIndex];
-    };
-
-    auto RightHorizontalVelocity = [horizontalVelocityCountX, horizontalVelocity](int blockX, int blockY) -> float {
-        int velocityIndex = blockX + horizontalVelocityCountX * blockY +1;
-        return horizontalVelocity[velocityIndex];
-    };
-
-    auto RightHorizontalVelocityLooping = [horizontalVelocityCountX, horizontalVelocity](int blockX, int blockY) -> float {
-        int velocityIndex = blockX + horizontalVelocityCountX * (blockY-1) + 1;
-        return horizontalVelocity[velocityIndex];
-    };
-
-    auto TopVerticalVelocity = [verticalVelocityCountX, verticalVelocity](int blockX, int blockY) -> float {
-        int velocityIndex = blockX + verticalVelocityCountX * blockY;
-        return verticalVelocity[velocityIndex];
-    };
-
     auto BottomVerticalVelocity = [verticalVelocityCountX, verticalVelocity](int blockX, int blockY) -> float {
         int velocityIndex = blockX + verticalVelocityCountX * (blockY+1);
         return verticalVelocity[velocityIndex];
@@ -605,103 +449,31 @@ void FluidBox::Project(float* p)
         for (int blockX = 0; blockX < m_blockCountX; blockX++)
         {
             int blockIndex = BlockIndex(blockX, blockY);
-            uint8_t type = m_blockEdgeType[blockIndex];
+            
+            BlockConfig& blockConfig = m_blockConfig[blockIndex];
 
-            switch (type)
+            float blockDiv = 0;
+
+            if (blockConfig.isLeftConnected)
             {
-            case BlockEdge_VOID:
-                assert(blockX > 0 && blockY > 0 && blockX < m_blockCountX - 1 && blockY < m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY) - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_FILL:
-                continue;
-                break;
-            case BlockEdge_TOP_EDGE:
-                assert(blockX > 0 && blockX < m_blockCountX - 1 && blockY < m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_BOTTOM_EDGE:
-                assert(blockX > 0 && blockY > 0 && blockX < m_blockCountX - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LEFT_EDGE:
-                assert(blockY > 0 && blockX < m_blockCountX - 1 && blockY < m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY) - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_RIGHT_EDGE:
-                assert(blockX > 0 && blockY > 0 && blockY < m_blockCountY - 1);
-                div[blockIndex] = -LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY) - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_TOP_LEFT_CORNER:
-                assert(blockX < m_blockCountX - 1 && blockY < m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_TOP_RIGHT_CORNER:
-                assert(blockX > 0 && blockY < m_blockCountY - 1);
-                div[blockIndex] = -LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_BOTTOM_LEFT_CORNER:
-                assert(blockY > 0 && blockX < m_blockCountX - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY)
-                    - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_BOTTOM_RIGHT_CORNER:
-                assert(blockX > 0 && blockY > 0);
-                div[blockIndex] = - LeftHorizontalVelocity(blockX, blockY)
-                    - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_HORIZONTAL_PIPE:
-                assert(blockX > 0 && blockX < m_blockCountX - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_LEFT_VOID:
-                assert(blockX == 0 && blockY > 0 && blockY < m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY) - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_RIGHT_VOID:
-                assert(blockX == m_blockCountX - 1 && blockY > 0 && blockY < m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocityLooping(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY) - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_LEFT_TOP_EDGE:
-                assert(blockX == 0 && blockY == 0);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_RIGHT_TOP_EDGE:
-                assert(blockX == m_blockCountX - 1 && blockY == 0);
-                div[blockIndex] = RightHorizontalVelocityLooping(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    + BottomVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_LEFT_BOTTOM_EDGE:
-                assert(blockX == 0 && blockY == m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_RIGHT_BOTTOM_EDGE:
-                assert(blockX == m_blockCountX - 1 && blockY == m_blockCountY - 1);
-                div[blockIndex] = RightHorizontalVelocityLooping(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY)
-                    - TopVerticalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE:
-                assert(blockX == 0);
-                div[blockIndex] = RightHorizontalVelocity(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY);
-                break;
-            case BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE:
-                assert(blockX == m_blockCountX - 1);
-                div[blockIndex] = RightHorizontalVelocityLooping(blockX, blockY) - LeftHorizontalVelocity(blockX, blockY);
-                break;
-            default:
-                assert(false); // Invalid block edge type
+                blockDiv += -horizontalVelocity[blockConfig.leftVelocityIndex];
             }
+            if (blockConfig.isRightConnected)
+            {
+                blockDiv += horizontalVelocity[blockConfig.rightVelocityIndex];
+            }
+            if (blockConfig.isTopConnected)
+            {
+                blockDiv += -verticalVelocity[blockConfig.topVelocityIndex];
+            }
+            if (blockConfig.isBottomConnected)
+            {
+                blockDiv += verticalVelocity[blockConfig.bottomVelocityIndex];
+            }
+
+            div[blockIndex] = blockDiv;
+
+  
         }
     }
 
@@ -711,119 +483,59 @@ void FluidBox::Project(float* p)
         float maxCorrection = 0;
         for (int blockIndex = 0; blockIndex < m_blockCount; blockIndex++)
         {
-            uint8_t type = m_blockEdgeType[blockIndex];
-            float newP;
-            switch (type)
+            
+
+            //uint8_t type = m_blockEdgeType[blockIndex];
+
+            BlockConfig& blockConfig = m_blockConfig[blockIndex];
+
+            if (blockConfig.connectionCount == 0)
             {
-            case BlockEdge_VOID:
-                newP = 0.25f * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1]
-                    + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_FILL:
                 continue;
+            }
+
+            float newPBase = div[blockIndex];
+
+            if (blockConfig.isLeftConnected)
+            {
+                newPBase += p[blockConfig.leftBlockIndex];
+            }
+            if (blockConfig.isRightConnected)
+            {
+                newPBase += p[blockConfig.rightBlockIndex];
+            }
+            if (blockConfig.isTopConnected)
+            {
+                newPBase += p[blockConfig.topBlockIndex];
+            }
+            if (blockConfig.isBottomConnected)
+            {
+                newPBase += p[blockConfig.bottomBlockIndex];
+            }
+
+            float divisor;
+
+            switch (blockConfig.connectionCount)
+            {
+            case 1:
+                divisor = 1.f;
                 break;
-            case BlockEdge_TOP_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1]
-                    + p[blockIndex + m_blockCountX]
-                    );
+            case 2:
+                divisor = 0.5f;
                 break;
-            case BlockEdge_BOTTOM_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1]
-                    + p[blockIndex - m_blockCountX]
-                    );
+            case 3:
+                divisor = 1.f/3.f;
                 break;
-            case BlockEdge_LEFT_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1]
-                    + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_RIGHT_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex - 1]
-                    + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_TOP_LEFT_CORNER:
-                newP = (1.f / 2.f) * (div[blockIndex]
-                    + p[blockIndex + 1]
-                    + p[blockIndex + m_blockCountX]
-                    );
-                break;
-            case BlockEdge_TOP_RIGHT_CORNER:
-                newP = (1.f / 2.f) * (div[blockIndex]
-                    + p[blockIndex - 1]
-                    + p[blockIndex + m_blockCountX]
-                    );
-                break;
-            case BlockEdge_BOTTOM_LEFT_CORNER:
-                newP = (1.f / 2.f) * (div[blockIndex]
-                    + p[blockIndex + 1]
-                    + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_BOTTOM_RIGHT_CORNER:
-                newP = (1.f / 2.f) * (div[blockIndex]
-                    + p[blockIndex - 1]
-                    + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_HORIZONTAL_PIPE:
-                newP = 0.5f * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1]);
-                break;
-            case BlockEdge_LOOPING_LEFT_VOID:
-                newP = 0.25f * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]
-                    + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_LOOPING_RIGHT_VOID:
-                newP = 0.25f * (div[blockIndex]
-                    + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]
-                    + p[blockIndex + m_blockCountX] + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_LOOPING_LEFT_TOP_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]
-                    + p[blockIndex + m_blockCountX]
-                    );
-                break;
-            case BlockEdge_LOOPING_RIGHT_TOP_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]
-                    + p[blockIndex + m_blockCountX]
-                    );
-                break;
-            case BlockEdge_LOOPING_LEFT_BOTTOM_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]
-                    + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_LOOPING_RIGHT_BOTTOM_EDGE:
-                newP = (1.f / 3.f) * (div[blockIndex]
-                    + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]
-                    + p[blockIndex - m_blockCountX]
-                    );
-                break;
-            case BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE:
-                newP = 0.5f * (div[blockIndex]
-                    + p[blockIndex + 1] + p[blockIndex - 1 + m_blockCountX]);
-                break;
-            case BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE:
-                newP = 0.5f * (div[blockIndex]
-                    + p[blockIndex + 1 - m_blockCountX] + p[blockIndex - 1]);
+            case 4:
+                divisor = 0.25f;
                 break;
             default:
-                newP = 0;
-                assert(false); // Invalid block edge type
+                assert(false);
             }
+
+            float newP = divisor * newPBase;
+
+
 
             float oldP = p[blockIndex];
 
@@ -837,43 +549,7 @@ void FluidBox::Project(float* p)
                     
             p[blockIndex] = newPWithSOR;
 
-            //uint8_t type = blockType[Index(i, j)];
-            //if (type != 0 && false)
-            //{
-            //    //x[Index(0, j)] = b == 1 ? -x[Index(1, j)] : x[Index(1, j)];
-            //    //x[Index(m_blockCountX - 1, j)] = b == 1 ? -x[Index(m_blockCountX - 2, j)] : x[Index(m_blockCountX - 2, j)];
-
-            //    if (type == 1)
-            //    {
-            //        // Left border
-            //        //x[Index(i, j)] = x[Index(i-1, j)];
-            //        p[Index(i, j)] = p[Index(i - 1, j)];
-            //    }
-            //    else if (type == 2)
-            //    {
-            //        p[Index(i, j)] = p[Index(i + 1, j)];
-            //        //x[Index(i, j)] = -x[Index(i + 1, j)];
-            //    }
-
-
-            //    //x[Index(i, j)] = 0;
-            //    /*if(b==0)
-            //    x[Index(i, 0)] = b == 0 ? x[Index(i, 1)] : 0;
-            //    x[Index(i, m_blockCountY - 1)] = b == 0 ? x[Index(i, m_blockCountY - 2)] : 0;*/
-            //}
-            //else
-            //{
-
-            //    //float newP = - 0.25 * (div[Index(i, j)] + p[IndexLoop(i + 1, j)] + p[IndexLoop(i - 1, j)] + p[Index(i, j + 1)] + p[Index(i, j - 1)]);
-            //    float newP = 0.5 * (div[Index(i, j)] + p[IndexLoop(i + 1, j)] + p[IndexLoop(i - 1, j)]);
-            //    float correction = abs(newP - p[Index(i, j)]);
-            //    if (maxCorrection < correction)
-            //    {
-            //        maxCorrection = correction;
-            //    }
-            //    p[Index(i, j)] = newP;
-            //}
-                
+         
         }
 
         //SetBound(0, p);
@@ -1271,10 +947,10 @@ void FluidBox::AdvectContent(float stepDt)
     float blockVolume = m_blockVolume;
     float ooBlockVolume = 1.f / blockVolume;
 
-    auto BIndex = [blockCountX](int bi, int bj) -> int
-    {
-        return (bi + blockCountX) % blockCountX + bj * blockCountX;
-    };
+    //auto BIndex = [blockCountX](int bi, int bj) -> int
+    //{
+    //    return (bi + blockCountX) % blockCountX + bj * blockCountX;
+    //};
 
     auto HIndex = [horizontalVelocityCountX](int bi, int bj, int di) -> int
     {
@@ -1294,17 +970,27 @@ void FluidBox::AdvectContent(float stepDt)
 
         memset(targetContent, 0, m_blockCount * sizeof(Content));
 
-        for (int j = 0; j < m_blockCountY; j++)
+        for (int bIndex = 0; bIndex < m_blockCount; bIndex++)
         {
-            for (int i = 0; i < m_blockCountX; i++)
-            {
-                int bIndex = BIndex(i, j);
-                Content& currentBlockcontent = currentContent[bIndex];
 
-                int vIndexTop = VIndex(i, j, 0);
+        //for (int j = 0; j < m_blockCountY; j++)
+        //{
+         //   for (int i = 0; i < m_blockCountX; i++)
+            {
+                //int bIndex = BIndex(i, j);
+                Content& currentBlockcontent = currentContent[bIndex];
+                BlockConfig& blockConfig = m_blockConfig[bIndex];
+
+                int vIndexTop = blockConfig.topVelocityIndex;
+                int vIndexBottom = blockConfig.bottomBlockIndex;
+                int vIndexLeft = blockConfig.leftVelocityIndex;
+                int vIndexRight = blockConfig.rightBlockIndex;
+
+
+                /*int vIndexTop = VIndex(i, j, 0);
                 int vIndexBottom = VIndex(i, j, 1);
                 int vIndexLeft = HIndex(i, j, 0);
-                int vIndexRight = HIndex(i, j, 1);
+                int vIndexRight = HIndex(i, j, 1);*/
 
                 float vTop = verticalVelocity[vIndexTop];
                 float vBottom = verticalVelocity[vIndexBottom];
@@ -1361,15 +1047,67 @@ void FluidBox::AdvectContent(float stepDt)
                 bool horizontalDivergence = divLeft && divRight;
                 bool verticalDivergence = divTop && divBottom;
 
-                auto DivDiagonalFill = [&]() -> bool
+                int hNeighbourIndex;
+                int vNeighbourIndex;
+                int diagNeighbourIndex;
+                float vy = 0.f;
+                float vx = 0.f;
+
+                auto IsDiagonalBlockAvailable = [&]() -> bool
                 {
-                    int di = divTop ? -1 : 1;
+                    if (divTop)
+                    {
+                        vNeighbourIndex = blockConfig.topBlockIndex;
+                        vy = vDivTop;
+                        if (divLeft)
+                        {
+                            diagNeighbourIndex = blockConfig.topLeftBlockIndex;
+                            hNeighbourIndex = blockConfig.leftBlockIndex;
+                            vx = vDivLeft;
+                        }
+                        else
+                        {
+                            diagNeighbourIndex = blockConfig.topRightBlockIndex;
+                            hNeighbourIndex = blockConfig.rightBlockIndex;
+                            vx = vDivRight;
+                        }
+                    }
+                    else
+                    {
+                        vNeighbourIndex = blockConfig.bottomBlockIndex;
+                        vy = vDivBottom;
+
+                        if (divLeft)
+                        {
+                            diagNeighbourIndex = blockConfig.bottomLeftBlockIndex;
+                            hNeighbourIndex = blockConfig.leftBlockIndex;
+                            vx = vDivLeft;
+                        }
+                        else
+                        {
+                            diagNeighbourIndex = blockConfig.bottomRightBlockIndex;
+                            hNeighbourIndex = blockConfig.rightBlockIndex;
+                            vx = vDivRight;
+                        }
+                    }
+
+                    
+                    if (diagNeighbourIndex < 0)
+                    {
+                        return false;
+                    }
+
+                  /*  int di = divTop ? -1 : 1;
                     int dj = divLeft ? -1 : 1;
-                    int diagIndex = BIndex(i + di, j + dj);
 
-                    BlockEdgeType type = (BlockEdgeType ) m_blockEdgeType[diagIndex];
 
-                    return type == BlockEdge_FILL;
+
+                    int diagIndex = BIndex(i + di, j + dj);*/
+
+                    //BlockEdgeType type = (BlockEdgeType ) m_blockEdgeType[diagIndex];
+
+                    //return type == BlockEdge_FILL;
+                    return !m_blockConfig[diagNeighbourIndex].isFill;
                 };
 
                 if (divergenceCount == 0)
@@ -1377,48 +1115,65 @@ void FluidBox::AdvectContent(float stepDt)
                     // 4 direction convergences : no movement
                     GiveContent(currentBlockcontent, targetContent[bIndex], 1.f, 0.f, true);
                 }
-                else if (divergenceCount == 2 && !horizontalDivergence && !verticalDivergence && !DivDiagonalFill())
+                else if (divergenceCount == 2 && !horizontalDivergence && !verticalDivergence && IsDiagonalBlockAvailable())
                 {
-                    float vy = vDivBottom - vDivTop;
-                    float vx = vDivRight - vDivLeft;
-
                     float dx = vx * dt;
                     float dy = vy * dt;
 
-                    float x = i + dx * m_ooBlockSize;
-                    float y = j + dy * m_ooBlockSize;
+                    float di = dx * m_ooBlockSize;
+                    float dj = dy * m_ooBlockSize;
 
-                    float i0 = floorf(x);
-                    float i1 = i0 + 1.0f;
+                    float horizontalMovingRatio = di;
+                    float verticalMovingRatio = dj;
 
-                    float j0 = floorf(y);
-                    float j1 = j0 + 1.0f;
+                    float horizontalStayRatio = 1.f - horizontalMovingRatio;
+                    float verticalStayRatio = 1.f - verticalMovingRatio;
 
-                    float s1 = x - i0;
-                    float s0 = 1.0f - s1;
-                    float t1 = y - j0;
-                    float t0 = 1.0f - t1;
 
-                    int i0i = (int)i0;
-                    int i1i = (int)i1;
-                    int j0i = (int)j0;
-                    int j1i = (int)j1;
+                    //float i0 = floorf(x);
+                    //float i1 = i0 + 1.0f;
 
-                    int tlBindex = BIndex(i0i, j0i);
-                    int trBindex = BIndex(i1i, j0i);
-                    int blBindex = BIndex(i0i, j1i);
-                    int brBindex = BIndex(i1i, j1i);
+                    //float j0 = floorf(y);
+                    //float j1 = j0 + 1.0f;
 
-                    float totalMovingRatio = 1.f
-                        - (tlBindex == bIndex ? s0 * t0 : 0.f)
-                        - (trBindex == bIndex ? s1 * t0 : 0.f)
-                        - (blBindex == bIndex ? s0 * t1 : 0.f)
-                        - (brBindex == bIndex ? s1 * t1 : 0.f);
+                    //float s1 = x - i0;
+                    //float s0 = 1.0f - s1;
+                    //float t1 = y - j0;
+                    //float t0 = 1.0f - t1;
 
-                    GiveContent(currentBlockcontent, targetContent[tlBindex], s0 * t0, totalMovingRatio, tlBindex == bIndex);
-                    GiveContent(currentBlockcontent, targetContent[trBindex], s1 * t0, totalMovingRatio, trBindex == bIndex);
-                    GiveContent(currentBlockcontent, targetContent[blBindex], s0 * t1, totalMovingRatio, blBindex == bIndex);
-                    GiveContent(currentBlockcontent, targetContent[brBindex], s1 * t1, totalMovingRatio, brBindex == bIndex);
+                    //int i0i = (int)i0;
+                    //int i1i = (int)i1;
+                    //int j0i = (int)j0;
+                    //int j1i = (int)j1;
+
+                    //int tlBindex = BIndex(i0i, j0i);
+                    //int trBindex = BIndex(i1i, j0i);
+                    //int blBindex = BIndex(i0i, j1i);
+                    //int brBindex = BIndex(i1i, j1i);
+
+                    //float totalMovingRatio = 1.f
+                    //    - (tlBindex == bIndex ? s0 * t0 : 0.f)
+                    //    - (trBindex == bIndex ? s1 * t0 : 0.f)
+                    //    - (blBindex == bIndex ? s0 * t1 : 0.f)
+                    //    - (brBindex == bIndex ? s1 * t1 : 0.f);
+
+                    
+                    float stayRatio = horizontalStayRatio * verticalStayRatio;
+
+                    float totalMovingRatio = 1.f - stayRatio;
+
+                    GiveContent(currentBlockcontent, targetContent[bIndex], stayRatio, totalMovingRatio, true);
+                    
+                    if (totalMovingRatio > 0.f)
+                    {
+                        GiveContent(currentBlockcontent, targetContent[hNeighbourIndex], horizontalMovingRatio * verticalStayRatio, totalMovingRatio, false);
+                        GiveContent(currentBlockcontent, targetContent[vNeighbourIndex], horizontalStayRatio * verticalMovingRatio, totalMovingRatio, false);
+                        GiveContent(currentBlockcontent, targetContent[diagNeighbourIndex], horizontalMovingRatio * verticalMovingRatio, totalMovingRatio, false);
+                    }
+                    //GiveContent(currentBlockcontent, targetContent[tlBindex], s0 * t0, totalMovingRatio, tlBindex == bIndex);
+                    //GiveContent(currentBlockcontent, targetContent[trBindex], s1 * t0, totalMovingRatio, trBindex == bIndex);
+                    //GiveContent(currentBlockcontent, targetContent[blBindex], s0 * t1, totalMovingRatio, blBindex == bIndex);
+                    //GiveContent(currentBlockcontent, targetContent[brBindex], s1 * t1, totalMovingRatio, brBindex == bIndex);
                 }
                 else
                 {
@@ -1439,25 +1194,28 @@ void FluidBox::AdvectContent(float stepDt)
 
                    GiveContent(currentBlockcontent, targetContent[bIndex], stayRatio, totalMovingRatio, true);
 
-                   if (divTop)
+                   if (totalMovingRatio > 0.f)
                    {
-                       assert(BIndex(i, j - 1) >= 0 && BIndex(i, j - 1) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j - 1)], vDivTop * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
-                   }
-                   if (divBottom)
-                   {
-                       assert(BIndex(i, j + 1) >= 0 && BIndex(i, j + 1) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i, j + 1)], vBottom * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
-                   }
-                   if (divLeft)
-                   {
-                       assert(BIndex(i - 1, j) >= 0 && BIndex(i - 1, j) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i - 1, j)], vDivLeft * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
-                   }
-                   if (divRight)
-                   {
-                       assert(BIndex(i + 1, j) >= 0 && BIndex(i + 1, j) < m_blockCount);
-                       GiveContent(currentBlockcontent, targetContent[BIndex(i + 1, j)], vDivRight * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
+                       if (divTop)
+                       {
+                           //assert(BIndex(i, j - 1) >= 0 && BIndex(i, j - 1) < m_blockCount);
+                           GiveContent(currentBlockcontent, targetContent[blockConfig.topBlockIndex], vDivTop * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
+                       }
+                       if (divBottom)
+                       {
+                           //assert(BIndex(i, j + 1) >= 0 && BIndex(i, j + 1) < m_blockCount);
+                           GiveContent(currentBlockcontent, targetContent[blockConfig.bottomBlockIndex], vBottom * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
+                       }
+                       if (divLeft)
+                       {
+                           //assert(BIndex(i - 1, j) >= 0 && BIndex(i - 1, j) < m_blockCount);
+                           GiveContent(currentBlockcontent, targetContent[blockConfig.leftBlockIndex], vDivLeft * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
+                       }
+                       if (divRight)
+                       {
+                           //assert(BIndex(i + 1, j) >= 0 && BIndex(i + 1, j) < m_blockCount);
+                           GiveContent(currentBlockcontent, targetContent[blockConfig.rightBlockIndex], vDivRight * dt * blockSection * ooBlockVolume, totalMovingRatio, false);
+                       }
                    }
                 }
             }
@@ -1658,7 +1416,8 @@ void FluidBox::CompileGrid()
         for (int blockX = 0; blockX < m_blockCountX; blockX++)
         {
             int blockIndex = BlockIndex(blockX, blockY);
-            uint8_t& type = m_blockEdgeType[blockIndex];
+            BlockConfig& blockConfig = m_blockConfig[blockIndex];
+            //uint8_t& type = m_blockEdgeType[blockIndex];
 
 
 
@@ -1685,6 +1444,63 @@ void FluidBox::CompileGrid()
                 return blockX + m_verticalVelocityCountX * (blockY + 1);
             };
 
+
+            blockConfig.leftVelocityIndex = LeftHorizontalVelocityIndex(blockX, blockY);
+            blockConfig.rightVelocityIndex = RightHorizontalVelocityIndex(blockX, blockY);
+            blockConfig.topVelocityIndex = TopVerticalVelocityIndex(blockX, blockY);
+            blockConfig.bottomVelocityIndex = BottomVerticalVelocityIndex(blockX, blockY);
+
+            
+            if (blockX == 0)
+            {
+                blockConfig.leftBlockIndex = m_isHorizontalLoop ? blockIndex - 1 + m_blockCountX : -1;
+                blockConfig.topLeftBlockIndex = m_isHorizontalLoop ? blockIndex - 1 : -1;
+                blockConfig.bottomLeftBlockIndex = m_isHorizontalLoop ? blockIndex - 1 + m_blockCountX + m_blockCountX : -1;
+            }
+            else
+            {
+                blockConfig.leftBlockIndex = blockIndex - 1;
+                blockConfig.topLeftBlockIndex = blockIndex - 1 - m_blockCountX;
+                blockConfig.bottomLeftBlockIndex = blockIndex - 1 + m_blockCountX;
+            }
+
+            //bool isRightFilled;
+            if (blockX == m_blockCountX - 1)
+            {
+                blockConfig.rightBlockIndex = m_isHorizontalLoop ? blockIndex + 1 - m_blockCountX : -1;
+                blockConfig.topRightBlockIndex = m_isHorizontalLoop ? blockIndex + 1 - m_blockCountX - m_blockCountX : -1;
+                blockConfig.bottomRightBlockIndex = m_isHorizontalLoop ? blockIndex + 1  : -1;
+            }
+            else
+            {
+                blockConfig.rightBlockIndex = blockIndex + 1;
+                blockConfig.topRightBlockIndex = blockIndex + 1 - m_blockCountX;
+                blockConfig.bottomRightBlockIndex = blockIndex + 1 + m_blockCountX;
+            }
+
+            if (blockY == 0)
+            {
+                blockConfig.topBlockIndex = -1;
+                blockConfig.topLeftBlockIndex = -1;
+                blockConfig.topRightBlockIndex = -1;
+            }
+            else
+            {
+                blockConfig.topBlockIndex = blockIndex - m_blockCountX;
+            }
+
+            if (blockY == m_blockCountY - 1)
+            {
+                blockConfig.bottomBlockIndex = -1;
+                blockConfig.bottomLeftBlockIndex = -1;
+                blockConfig.bottomRightBlockIndex = -1;
+            }
+            else
+            {
+                blockConfig.bottomBlockIndex = blockIndex + m_blockCountX;
+            }
+
+
             auto ConfigureVelocities = [&](VelocityType topType, VelocityType bottomType, VelocityType leftType, VelocityType rightType)
             {
                 m_horizontalVelocityType[LeftHorizontalVelocityIndex(blockX, blockY)] = leftType;
@@ -1698,251 +1514,45 @@ void FluidBox::CompileGrid()
             };
 
 
-            if (type == BlockEdge_FILL)
+            //if (type == BlockEdge_FILL)
+            if (blockConfig.isFill)
             {
                 ConfigureVelocities(Velocity_ZERO, Velocity_ZERO, Velocity_ZERO, Velocity_ZERO);
+                blockConfig.isLeftConnected = false;
+                blockConfig.isRightConnected = false;
+                blockConfig.isTopConnected = false;
+                blockConfig.isBottomConnected = false;
+                blockConfig.connectionCount = 0;
+
                 continue;
             }
 
-            bool isTopFilled = blockY == 0 || m_blockEdgeType[blockIndex - m_blockCountX] == BlockEdge_FILL;
-            bool isBottomFilled = blockY == m_blockCountY-1 || m_blockEdgeType[blockIndex + m_blockCountX] == BlockEdge_FILL;
-            bool isLeftFilled;
-            if (blockX == 0)
-            {
-                isLeftFilled = m_isHorizontalLoop ? m_blockEdgeType[blockIndex - 1 + m_blockCountX] == BlockEdge_FILL : true;
-            }
-            else
-            {
-                isLeftFilled = m_blockEdgeType[blockIndex - 1] == BlockEdge_FILL;
-            }
             
-            bool isRightFilled;
-            if (blockX == m_blockCountX-1)
+
+            
+            blockConfig.isLeftConnected = blockConfig.leftBlockIndex >= 0 && !m_blockConfig[blockConfig.leftBlockIndex].isFill;
+            blockConfig.isRightConnected = blockConfig.rightBlockIndex >= 0 && !m_blockConfig[blockConfig.rightBlockIndex].isFill;
+            blockConfig.isTopConnected = blockConfig.topBlockIndex >= 0 && !m_blockConfig[blockConfig.topBlockIndex].isFill;
+            blockConfig.isBottomConnected = blockConfig.bottomBlockIndex >= 0 && !m_blockConfig[blockConfig.bottomBlockIndex].isFill;
+            
+            blockConfig.connectionCount = blockConfig.isLeftConnected + blockConfig.isRightConnected+ blockConfig.isTopConnected + blockConfig.isBottomConnected;
+
+
+            VelocityType topType = blockConfig.isTopConnected ? Velocity_FREE : Velocity_ZERO;
+            VelocityType bottomType = blockConfig.isBottomConnected ? Velocity_FREE : Velocity_ZERO;
+            VelocityType leftType = blockConfig.isLeftConnected ? Velocity_FREE : Velocity_ZERO;
+            VelocityType rightType = blockConfig.isRightConnected ? Velocity_FREE : Velocity_ZERO;
+
+            if (blockX == 0 && leftType == Velocity_FREE)
             {
-                isRightFilled = m_isHorizontalLoop ? m_blockEdgeType[blockIndex + 1 - m_blockCountX] == BlockEdge_FILL : true;
+                leftType = Velocity_LOOPING_LEFT;
             }
-            else
+            else if (blockX == m_blockCountX - 1 && rightType == Velocity_FREE)
             {
-                isRightFilled = m_blockEdgeType[blockIndex + 1] == BlockEdge_FILL;
+                rightType =  Velocity_LOOPING_RIGHT;
             }
 
-            if (isTopFilled)
-            {
-                if (isBottomFilled)
-                {
-                    if (isLeftFilled)
-                    {
-                        if (isRightFilled)
-                        {
-                            //  #
-                            // #x#
-                            //  #
-                            assert(false); // Not handled yet
-                        }
-                        else
-                        {
-                            //  #
-                            // #x-
-                            //  #
-                            assert(false); // Not handled yet
-                        }
-                    }
-                    else
-                    {
-                        if (isRightFilled)
-                        {
-                            //  #
-                            // -x#
-                            //  #
-                            assert(false); // Not handled yet
-                        }
-                        else
-                        {
-                            //  #
-                            // -x-
-                            //  #
-                            if (blockX == 0)
-                            {
-                                type = BlockEdge_LOOPING_LEFT_HORIZONTAL_PIPE;
-                                ConfigureVelocities(Velocity_ZERO, Velocity_ZERO, Velocity_LOOPING_LEFT, Velocity_FREE);
-                            }
-                            else if (blockX == m_blockCountX - 1)
-                            {
-                                type = BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE;
-                                ConfigureVelocities(Velocity_ZERO, Velocity_ZERO, Velocity_FREE, Velocity_LOOPING_RIGHT);
-                            }
-                            else
-                            {
-                                type = BlockEdge_HORIZONTAL_PIPE;
-                                ConfigureVelocities(Velocity_ZERO, Velocity_ZERO, Velocity_FREE, Velocity_FREE);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if (isLeftFilled)
-                    {
-                        if (isRightFilled)
-                        {
-                            //  #
-                            // #x#
-                            //  -
-                            assert(false); // Not handled yet
-                        }
-                        else
-                        {
-                            //   #
-                             // #x-
-                             //  -
-                            type = BlockEdge_TOP_LEFT_CORNER;
-                            ConfigureVelocities(Velocity_ZERO, Velocity_FREE, Velocity_ZERO, Velocity_FREE);
-                        }
-                    }
-                    else
-                    {
-                        if (isRightFilled)
-                        {
-                            //  #
-                            // -x#
-                            //  -
-                            type = BlockEdge_TOP_RIGHT_CORNER;
-                            ConfigureVelocities(Velocity_ZERO, Velocity_FREE, Velocity_FREE, Velocity_ZERO);
-                        }
-                        else
-                        {
-                            //  #
-                            // -x-
-                            //  -
-                            if (blockX == 0)
-                            {
-                                type = BlockEdge_LOOPING_LEFT_TOP_EDGE;
-                                ConfigureVelocities(Velocity_ZERO, Velocity_FREE, Velocity_LOOPING_LEFT, Velocity_FREE);
-                            }
-                            else if (blockX == m_blockCountX - 1)
-                            {
-                                type = BlockEdge_LOOPING_RIGHT_TOP_EDGE;
-                                ConfigureVelocities(Velocity_ZERO, Velocity_LOOPING_RIGHT, Velocity_FREE, Velocity_LOOPING_RIGHT);
-                            }
-                            else
-                            {
-                                type = BlockEdge_TOP_EDGE;
-                                ConfigureVelocities(Velocity_ZERO, Velocity_FREE, Velocity_FREE, Velocity_FREE);
-                            }
-                            
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (isBottomFilled)
-                {
-                    if (isLeftFilled)
-                    {
-                        if (isRightFilled)
-                        {
-                            //  -
-                            // #x#
-                            //  #
-                            assert(false); // Not handled yet
-                        }
-                        else
-                        {
-                            //  -
-                            // #x-
-                            //  #                            
-                            type = BlockEdge_BOTTOM_LEFT_CORNER;
-                            ConfigureVelocities(Velocity_FREE, Velocity_ZERO, Velocity_ZERO, Velocity_FREE);
-                        }
-                    }
-                    else
-                    {
-                        if (isRightFilled)
-                        {
-                            //  -
-                            // -x#
-                            //  #
-                            type = BlockEdge_BOTTOM_RIGHT_CORNER;
-                            ConfigureVelocities(Velocity_FREE, Velocity_ZERO, Velocity_FREE, Velocity_ZERO);
-                        }
-                        else
-                        {
-                            //  -
-                            // -x-
-                            //  #
-                            if (blockX == 0)
-                            {
-                                type = BlockEdge_LOOPING_LEFT_BOTTOM_EDGE;
-                                ConfigureVelocities(Velocity_FREE, Velocity_ZERO, Velocity_LOOPING_LEFT, Velocity_FREE);
-                            }
-                            else if (blockX == m_blockCountX - 1)
-                            {
-                                type = BlockEdge_LOOPING_RIGHT_BOTTOM_EDGE;
-                                ConfigureVelocities(Velocity_LOOPING_RIGHT, Velocity_ZERO, Velocity_FREE, Velocity_LOOPING_RIGHT);
-                            }
-                            else
-                            {
-                                type = BlockEdge_BOTTOM_EDGE;
-                                ConfigureVelocities(Velocity_FREE, Velocity_ZERO, Velocity_FREE, Velocity_FREE);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if (isLeftFilled)
-                    {
-                        if (isRightFilled)
-                        {
-                            //  -
-                            // #x#
-                            //  -
-                            assert(false); // Not handled yet
-                        }
-                        else
-                        {
-                            //  -
-                            // #x-
-                            //  -
-                            type = BlockEdge_LEFT_EDGE;
-                            ConfigureVelocities(Velocity_FREE, Velocity_FREE, Velocity_ZERO, Velocity_FREE);
-                        }
-                    }
-                    else
-                    {
-                        if (isRightFilled)
-                        {
-                            //  -
-                            // -x#
-                            //  -
-                            type = BlockEdge_RIGHT_EDGE;
-                            ConfigureVelocities(Velocity_FREE, Velocity_FREE, Velocity_FREE, Velocity_ZERO);
-                        }
-                        else
-                        {
-                            //  -
-                            // -x-
-                            //  -
-                            if (blockX == 0)
-                            {
-                                type = BlockEdge_LOOPING_LEFT_VOID;
-                                ConfigureVelocities(Velocity_FREE, Velocity_FREE, Velocity_LOOPING_LEFT, Velocity_FREE);
-                            }
-                            else if (blockX == m_blockCountX - 1)
-                            {
-                                type = BlockEdge_LOOPING_RIGHT_VOID;
-                                ConfigureVelocities(Velocity_LOOPING_RIGHT, Velocity_LOOPING_RIGHT, Velocity_FREE, Velocity_LOOPING_RIGHT);
-                            }
-                            else
-                            {
-                                type = BlockEdge_VOID;
-                                ConfigureVelocities(Velocity_FREE, Velocity_FREE, Velocity_FREE, Velocity_FREE);
-                            }
-                        }
-                    }
-                }
-            }           
+            ConfigureVelocities(topType, bottomType, leftType, rightType);        
         }
     }
 

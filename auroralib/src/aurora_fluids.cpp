@@ -74,20 +74,12 @@ Fluids::Fluids()
 
     auto drawVSep = [&](int sepX, int sepY0, int sepY1)
     {
-        //m_fluidBox->blockEdgeType[m_fluidBox->BlockIndex(sepX + 1, sepY0 - 1)] = FluidBox::BlockEdge_BOTTOM_EDGE;
-        //m_fluidBox->blockEdgeType[m_fluidBox->BlockIndex(sepX + 1, sepY1)] = FluidBox::BlockEdge_TOP_EDGE;
-
-        //m_fluidBox->velocityYType[m_fluidBox->BlockIndex(sepX + 1, sepY0)] = FluidBox::Velocity_ZERO;
-        //m_fluidBox->velocityYType[m_fluidBox->BlockIndex(sepX + 1, sepY1)] = FluidBox::Velocity_ZERO;
-
         for (int j = sepY0; j < sepY1; j++)
         {
-            //m_fluidBox->blockEdgeType[m_fluidBox->BlockIndex(sepX, j)] = FluidBox::BlockEdge_RIGHT_EDGE;
-            m_fluidBox->m_blockEdgeType[m_fluidBox->BlockIndex(sepX + 1, j)] = FluidBox::BlockEdge_FILL;
-            //m_fluidBox->blockEdgeType[m_fluidBox->BlockIndex(sepX + 2, j)] = FluidBox::BlockEdge_LEFT_EDGE;
-
-            //m_fluidBox->velocityXType[m_fluidBox->BlockIndex(sepX + 1, j)] = FluidBox::Velocity_ZERO;
-            //m_fluidBox->velocityXType[m_fluidBox->BlockIndex(sepX + 2, j)] = FluidBox::Velocity_ZERO;
+            
+            //m_fluidBox->m_blockEdgeType[m_fluidBox->BlockIndex(sepX + 1, j)] = FluidBox::BlockEdge_FILL;
+            m_fluidBox->m_blockConfig[m_fluidBox->BlockIndex(sepX + 1, j)].isFill;
+            
         }
     };
     
@@ -148,7 +140,7 @@ void Fluids::FillTile(bool fill, Vector2 mousePosition)
         return;
     }
 
-    m_fluidBox->m_blockEdgeType[m_fluidBox->BlockIndex(i, j)] = fill ? FluidBox::BlockEdge_FILL : FluidBox::BlockEdge_VOID;
+    m_fluidBox->m_blockConfig[m_fluidBox->BlockIndex(i, j)].isFill = fill;
     m_fluidBox->CompileGrid();
     m_fluidBox->SetContent(i, j, 0.f, 0.f, 0.f);
 }
@@ -420,12 +412,9 @@ void Fluids::_draw()
                 Vector2 position((real_t)i * blockSize, (real_t)j * blockSize);
                 int index = m_fluidBox->BlockIndex(i, j);
 
-                uint8_t type = m_fluidBox->m_blockEdgeType[index];
-                switch (type)
+                if(m_fluidBox->m_blockConfig[index].isFill)
                 {
-                case FluidBox::BlockEdge_FILL:
                     DrawRect(position, Vector2(blockSize, blockSize), Color(0.5f, 0.5f, 0.5f), true);
-                    break;
                 }
             }
         }
@@ -437,7 +426,29 @@ void Fluids::_draw()
                 Vector2 position((real_t)i * blockSize, (real_t)j * blockSize);
                 int index = m_fluidBox->BlockIndex(i, j);
 
-                uint8_t type = m_fluidBox->m_blockEdgeType[index];
+                FluidBox::BlockConfig& blockConfig = m_fluidBox->m_blockConfig[index];
+
+                if (!blockConfig.isTopConnected)
+                {
+                    DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
+                }
+
+                if (!blockConfig.isBottomConnected)
+                {
+                    DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
+                }
+
+                if (!blockConfig.isLeftConnected)
+                {
+                    DrawLine(position, position + Vector2(0, blockSize), Color(1.0f, 1.f, 1.0f), true);
+                }
+
+                if (!blockConfig.isRightConnected)
+                {
+                    DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
+                }
+
+                /*uint8_t type = m_fluidBox->m_blockEdgeType[index];
                 switch (type)
                 {
                 case FluidBox::BlockEdge_VOID:
@@ -499,7 +510,7 @@ void Fluids::_draw()
                     break;
                 default:
                     DrawRect(position, Vector2(blockSize, blockSize), Color(1.f, 0.f, 0.f, 0.5f), true);
-                }
+                }*/
             }
         }
 
@@ -617,8 +628,7 @@ void Fluids::_draw()
                 {
                     int index = m_fluidBox->BlockIndex(i, j);
 
-                    uint8_t type = m_fluidBox->m_blockEdgeType[index];
-                    if (type == FluidBox::BlockEdge_FILL)
+                    if (m_fluidBox->m_blockConfig[index].isFill)
                     {
                         continue;
                     }

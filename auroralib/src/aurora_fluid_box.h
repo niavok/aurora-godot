@@ -2,6 +2,7 @@
 #define AURORA_FLUID_BOX_H
 
 #include <stdint.h>
+#include <vector>
 
 namespace godot {
 
@@ -30,7 +31,7 @@ public:
     void CompileGrid();
     
 
-    enum BlockEdgeType
+    /*enum BlockEdgeType
     {
         BlockEdge_VOID,
         BlockEdge_FILL,
@@ -51,6 +52,33 @@ public:
         BlockEdge_LOOPING_RIGHT_TOP_EDGE,
         BlockEdge_LOOPING_RIGHT_BOTTOM_EDGE,    
         BlockEdge_LOOPING_RIGHT_HORIZONTAL_PIPE,
+    };*/
+
+    struct BlockConfig
+    {
+        bool isFill : 1;
+        bool isLeftConnected : 1;
+        bool isRightConnected : 1;
+        bool isTopConnected : 1;
+        bool isBottomConnected : 1;
+        uint8_t connectionCount : 3;
+            
+        int32_t leftBlockIndex;
+        int32_t rightBlockIndex;
+        int32_t topBlockIndex;
+        int32_t bottomBlockIndex;
+
+        int32_t topLeftBlockIndex;
+        int32_t topRightBlockIndex;
+        int32_t bottomLeftBlockIndex;
+        int32_t bottomRightBlockIndex;
+
+        int32_t leftVelocityIndex;
+        int32_t rightVelocityIndex;
+        int32_t topVelocityIndex;
+        int32_t bottomVelocityIndex;
+
+        void Init();
     };
 
     enum VelocityType
@@ -61,7 +89,8 @@ public:
         Velocity_LOOPING_RIGHT,
     };
 
-    uint8_t* m_blockEdgeType;
+    std::vector<BlockConfig> m_blockConfig;
+    //uint8_t* m_blockEdgeType;
     uint8_t* m_horizontalVelocityType;
     uint8_t* m_verticalVelocityType;
 
