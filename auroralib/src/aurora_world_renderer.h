@@ -8,8 +8,12 @@
 
 namespace godot {
 
-    class WorldRenderer : public Sprite {
-    GODOT_CLASS(WorldRenderer, Sprite)
+
+using namespace aurora;
+
+
+class WorldRenderer : public Sprite {
+GODOT_CLASS(WorldRenderer, Sprite)
 
 public:
     static void _register_methods();
@@ -28,10 +32,12 @@ private:
     void FillTile(bool fill, Vector2 mousePosition);
 
     
-    aurora::AuroraWorld* m_world;
+    AuroraWorld* m_world;
+    AVectorI m_localTileReferenceCoord;
+
     bool m_paused = true;
     
-    float totalDuration = 0;
+    float m_totalDuration = 0;
 
 
     float m_worldStepDt;
