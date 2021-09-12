@@ -4,6 +4,7 @@
 namespace godot {
 namespace aurora {
 
+constexpr float TILE_SIZE = 0.1f;
 constexpr int TILE_PER_BLOCK_LINE = 16;
 constexpr int BLOCK_PER_CHUNK_LINE = 16;
 constexpr int TILE_PER_CHUNK_LINE = TILE_PER_BLOCK_LINE * BLOCK_PER_CHUNK_LINE;

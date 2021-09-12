@@ -5,6 +5,12 @@
 namespace godot {
 namespace aurora {
 
+void AuroraWorldChunk::Init(AVectorI chunkCoord)
+{
+	m_chunkCoord = chunkCoord;
+}
+
+
 void AuroraWorldChunk::SetTileMaterial(AVectorI relativeTileCoord, TileMaterial material)
 {
 	if (m_isHomogeneous)
@@ -52,7 +58,7 @@ void AuroraWorldChunk::TryMergeChunk()
 {
 	assert(!m_isHomogeneous);
 
-	for (int index = 1; index < BLOCK_PER_CHUNK; index++)
+	for (int index = 0; index < BLOCK_PER_CHUNK; index++)
 	{
 		if (!m_blocks[index].IsHomogeneous())
 		{
@@ -77,15 +83,27 @@ void AuroraWorldChunk::TryMergeChunk()
 
 AuroraWorldBlock& AuroraWorldChunk::GetBlockAndLocalCoord(AVectorI relativeTileCoord, AVectorI& localBlockCoord)
 {
-	localBlockCoord.x = relativeTileCoord.x % TILE_PER_BLOCK_LINE;
-	localBlockCoord.y = relativeTileCoord.y % TILE_PER_BLOCK_LINE;
+	localBlockCoord.x = (relativeTileCoord.x % TILE_PER_BLOCK_LINE);
+	localBlockCoord.y = (relativeTileCoord.y % TILE_PER_BLOCK_LINE);
 
 	int blockIndexX = relativeTileCoord.x / BLOCK_PER_CHUNK_LINE;
 	int blockIndexY = relativeTileCoord.y / BLOCK_PER_CHUNK_LINE;
 
+	assert(blockIndexX >= 0);
+	assert(blockIndexX < BLOCK_PER_CHUNK_LINE);
+	assert(blockIndexY >= 0);
+	assert(blockIndexY < BLOCK_PER_CHUNK_LINE);
+
 	return m_blocks[blockIndexX + blockIndexY * BLOCK_PER_CHUNK_LINE];
 }
 
+
+
+AuroraWorldBlock& AuroraWorldChunk::GetBlock(AVectorI blockCoord)
+{
+	assert(!m_isHomogeneous);
+	return m_blocks[blockCoord.x + blockCoord.y * BLOCK_PER_CHUNK_LINE];
+}
 
 
 }

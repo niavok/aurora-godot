@@ -4,6 +4,7 @@
 #include <Vector2.hpp>
 #include <Vector3.hpp>
 #include <Viewport.hpp>
+#include <cassert>
 
 namespace godot
 {
@@ -32,10 +33,8 @@ void WorldRenderer::FillTile(bool fill, Vector2 mousePosition)
 
     Vector2 relativeWorldPosition = (mousePosition - RENDER_DEBUG_OFFSET) / RENDER_DEBUG_SCALE;
 
-    float blockSize = m_world->GetTileSize();
-
-    int i = int(relativeWorldPosition.x / blockSize);
-    int j = int(relativeWorldPosition.y / blockSize);
+    int i = int(relativeWorldPosition.x / aurora::TILE_SIZE);
+    int j = int(relativeWorldPosition.y / aurora::TILE_SIZE);
 
     AVectorI tileCoord = m_localTileReferenceCoord + AVectorI(i, j);
 
@@ -164,31 +163,49 @@ void WorldRenderer::PrintWorldState()
     Godot::print("Step");
 }
 
+Vector2 WorldRenderer::WorldPositionToDraw(AVectorI worldPosition)
+{
+    AVectorI  positionInReference = worldPosition - m_localTileReferenceCoord;
+    return RENDER_DEBUG_OFFSET + positionInReference * TILE_SIZE * RENDER_DEBUG_SCALE;
+}
+
+Vector2 WorldRenderer::WorldSizeToDraw(AVectorI worldSize)
+{
+    return worldSize * TILE_SIZE * RENDER_DEBUG_SCALE;
+};
+
+void WorldRenderer::DrawRect(AVectorI worldPosition, AVectorI worldSize, Color color, bool filled, real_t width)
+{
+    draw_rect(Rect2(WorldPositionToDraw(worldPosition), WorldSizeToDraw(worldSize)), color, filled, width);
+};
+
+void WorldRenderer::DrawLine(AVectorI worldPosition1, AVectorI worldPosition2, Color color, real_t width)
+{
+    draw_line(WorldPositionToDraw(worldPosition1), WorldPositionToDraw(worldPosition2), color, width);
+};
+
 void WorldRenderer::_draw()
 {
-    Vector2 drawPosition = RENDER_DEBUG_OFFSET;
 
-    auto WorldPositionToDraw = [&](Vector2 worldPosition)
-    {
-        return drawPosition + worldPosition * RENDER_DEBUG_SCALE;
-    };
+    ARectI drawRect;
+    drawRect.position = m_localTileReferenceCoord;
+    drawRect.size = AVectorI(0,0);
 
-    auto WorldSizeToDraw = [&](Vector2 worldSize)
-    {
-        return worldSize * RENDER_DEBUG_SCALE;
-    };
+    m_world->SelectChunks(drawRect, [this](AuroraWorldChunk& chunk, ARectI& localRect)
+        {
+            DrawChunk(chunk);
+        });
 
-    auto DrawRect = [&](Vector2 worldPosition, Vector2 worldSize, Color color, bool filled, real_t width = 1.f)
-    {
-        draw_rect(Rect2(WorldPositionToDraw(worldPosition), WorldSizeToDraw(worldSize)), color, filled, width);
-    };
 
-    auto DrawLine = [&](Vector2 worldPosition1, Vector2 worldPosition2, Color color, real_t width = 1.f)
-    {
-        draw_line(WorldPositionToDraw(worldPosition1), WorldPositionToDraw(worldPosition2), color, width);
-    };
 
-    float blockSize = m_world->GetTileSize();
+    //    Vector2 relativeWorldPosition = (mousePosition - RENDER_DEBUG_OFFSET) / RENDER_DEBUG_SCALE;
+
+    //float blockSize = m_world->GetTileSize();
+
+    //int i = int(relativeWorldPosition.x / blockSize);
+    //int j = int(relativeWorldPosition.y / blockSize);
+
+    //AVectorI tileCoord = m_localTileReferenceCoord + AVectorI(i, j);
 
 
     //auto DrawBorder = [&]()
@@ -511,5 +528,108 @@ void WorldRenderer::_draw()
     //}
 
 }
+
+
+Color WorldRenderer::GetMaterialDebugColor(TileMaterial material, bool border)
+{
+    Color materialColor;
+    switch (material)
+    {
+    case TileMaterial::Air:
+        materialColor = Color(0.5f, 0.6f, 0.7f, 0.1);
+        break;
+    case TileMaterial::Aerock:
+        materialColor = Color(0.3f, 0.1f, 0.1f, 1.f);
+        break;
+    case TileMaterial::Vaccum:
+        materialColor = Color(0.f, 0.f, 0.f, 0.f);
+        break;
+    default:
+        assert(false);
+        materialColor = Color(1.0f, 0.f, 0.f);
+    }
+
+    if (border)
+    {
+        materialColor *= 1.2f;
+    }
+
+    return materialColor;
+}
+;
+Color chunkBorderColor(0.5f, 0.6f, 0.7f, 1.f);
+
+
+void WorldRenderer::DrawChunk(AuroraWorldChunk& chunk)
+{
+
+    AVectorI chunkTilePosition = chunk.GetChunkCoord() * TILE_PER_CHUNK_LINE;
+    
+    if (chunk.IsHomogeneous())
+    {
+        Color chunkColor = GetMaterialDebugColor(chunk.GetChunkMaterial());
+        Color chunkBorderColor = GetMaterialDebugColor(chunk.GetChunkMaterial(), true);
+
+        AVectorI chunkTileSize(TILE_PER_CHUNK_LINE, TILE_PER_CHUNK_LINE);
+
+        DrawRect(chunkTilePosition, chunkTileSize, chunkColor, true);
+        DrawRect(chunkTilePosition, chunkTileSize, chunkBorderColor, false);
+    }
+    else
+    {
+        AVectorI blockCoord;
+        for (blockCoord.x = 0; blockCoord.x < BLOCK_PER_CHUNK_LINE; blockCoord.x++)
+        {
+            for (blockCoord.y = 0; blockCoord.y < BLOCK_PER_CHUNK_LINE; blockCoord.y++)
+            {
+                AuroraWorldBlock& block = chunk.GetBlock(blockCoord);
+                AVectorI blockTilePosition = chunkTilePosition + blockCoord * TILE_PER_BLOCK_LINE;
+                
+
+                DrawBlock(block, blockTilePosition);
+            }
+        }
+    }
+}
+
+void WorldRenderer::DrawBlock(AuroraWorldBlock& block, AVectorI drawTilePosition)
+{
+    if (block.IsHomogeneous())
+    {
+        Color blockColor = GetMaterialDebugColor(block.GetBlockMaterial());
+        Color blockBorderColor = GetMaterialDebugColor(block.GetBlockMaterial(), true);
+
+        AVectorI blockTileSize(TILE_PER_BLOCK_LINE, TILE_PER_BLOCK_LINE);
+
+        DrawRect(drawTilePosition, blockTileSize, blockColor, true);
+        DrawRect(drawTilePosition, blockTileSize, blockBorderColor, false);
+    }
+    else
+    {
+        AVectorI tileCoord;
+        for (tileCoord.x = 0; tileCoord.x < TILE_PER_BLOCK_LINE; tileCoord.x++)
+        {
+            for (tileCoord.y = 0; tileCoord.y < TILE_PER_BLOCK_LINE; tileCoord.y++)
+            {
+                AuroraWorldTile& tile = block.GetTile(tileCoord);
+                AVectorI tileTilePosition = drawTilePosition + tileCoord;
+
+                DrawTile(tile, tileTilePosition);
+            }
+        }
+    }
+}
+
+void WorldRenderer::DrawTile(AuroraWorldTile& tile, AVectorI drawTilePosition)
+{
+    Color blockColor = GetMaterialDebugColor(tile.GetTileMaterial());
+    Color blockBorderColor = GetMaterialDebugColor(tile.GetTileMaterial(), true);
+
+    AVectorI tileSize(1, 1);
+
+    DrawRect(drawTilePosition, tileSize, blockColor, true);
+    //DrawRect(drawTilePosition, tileSize, blockBorderColor, false);
+}
+
 
 }

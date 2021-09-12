@@ -31,5 +31,25 @@ AVectorI AVectorI::operator+(AVectorI const& o) const
 	return AVectorI(x + o.x, y + o.y);
 }
 
+AVectorI AVectorI::operator-(AVectorI const& o) const
+{
+	return AVectorI(x - o.x, y - o.y);
+}
+
+Vector2 AVectorI::operator*(float o) const
+{
+	return Vector2(x * o, y * o);
+}
+
+AVectorI AVectorI::operator*(int o) const
+{
+	return AVectorI(x * o, y * o);
+}
+
+AVectorI AVectorI::operator/(int o) const
+{
+	return AVectorI(x / o, y / o);
+}
+
 }
 }

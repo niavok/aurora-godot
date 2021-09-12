@@ -13,7 +13,7 @@ public:
 	TileMaterial GetTileMaterial() const;
 
 private:
-	TileMaterial m_tileMaterial;
+	TileMaterial m_tileMaterial = TileMaterial::Air;
 };
 
 }

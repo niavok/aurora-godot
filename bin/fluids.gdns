@@ -3,7 +3,6 @@
 [ext_resource path="res://bin/auroralib.gdnlib" type="GDNativeLibrary" id=1]
 
 [resource]
-
 resource_name = "fluids"
-class_name = "Fluids"
+class_name = "WorldRenderer"
 library = ExtResource( 1 )

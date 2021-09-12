@@ -31,7 +31,20 @@ private:
     void PrintWorldState();
     void FillTile(bool fill, Vector2 mousePosition);
 
-    
+
+    Vector2 WorldPositionToDraw(AVectorI worldPosition);
+    Vector2 WorldSizeToDraw(AVectorI worldSize);
+
+    void DrawRect(AVectorI worldPosition, AVectorI worldSize, Color color, bool filled, real_t width = 1.f);
+    void DrawLine(AVectorI worldPosition1, AVectorI worldPosition2, Color color, real_t width = 1.f);
+
+    Color GetMaterialDebugColor(TileMaterial material, bool border = false);
+
+
+    void DrawChunk(AuroraWorldChunk& chunk);
+    void DrawBlock(AuroraWorldBlock& block, AVectorI drawTilePosition);
+    void DrawTile(AuroraWorldTile& tile, AVectorI drawTilePosition);
+
     AuroraWorld* m_world;
     AVectorI m_localTileReferenceCoord;
 

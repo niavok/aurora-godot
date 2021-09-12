@@ -17,7 +17,6 @@ public:
 	bool SetBlockMaterial(TileMaterial material);
 
 	bool IsHomogeneous() const;
-
 	AuroraWorldTile& GetTile(AVectorI relativeTileCoord);
 
 	TileMaterial GetBlockMaterial() const;
@@ -27,8 +26,8 @@ private:
 	void SplitBlock();
 	void TryMergeBlock();
 
-	bool m_isHomogeneous;
-	TileMaterial m_blockMaterial;
+	bool m_isHomogeneous = true;
+	TileMaterial m_blockMaterial = TileMaterial::Air;
 	std::vector<AuroraWorldTile> m_tiles;
 };
 
