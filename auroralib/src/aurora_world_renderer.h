@@ -25,6 +25,9 @@ public:
 
     void _process(float delta);
 
+    void _input(Variant event);
+
+
     void _draw();
 private:
     void StepWorld(float dt);
@@ -51,6 +54,7 @@ private:
     bool m_paused = true;
     
     float m_totalDuration = 0;
+    int m_cursorSize = 1;
 
 
     float m_worldStepDt;

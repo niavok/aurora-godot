@@ -67,6 +67,14 @@ void AuroraWorld::SetTileMaterial(AVectorI tileCoord, TileMaterial material)
 	chunk.SetTileMaterial(localChunkCoord, material);
 }
 
+void AuroraWorld::SetTileMaterial(ARectI tileRect, TileMaterial material)
+{
+	SelectChunks(tileRect, [this, material](AuroraWorldChunk& chunk, ARectI& localRect)
+		{
+			chunk.SetTileMaterial(localRect, material);
+		});
+}
+
 void AuroraWorld::Step(float dt)
 {
 
@@ -82,20 +90,24 @@ void AuroraWorld::SelectChunks(ARectI rectTileCoord, std::function<void(AuroraWo
 	AVectorI localStartChunkCoord;
 	AuroraWorldChunk& startChunk = GetChunkAndLocalCoord(rectTileCoord.position, localStartChunkCoord);
 
+	AVectorI localEndChunkCoord;
+	AuroraWorldChunk& endChunk = GetChunkAndLocalCoord(rectTileCoord.position + rectTileCoord.size - AVectorI(1) , localEndChunkCoord);
+
 	AVectorI chunkCount = AVectorI(1,1) + rectTileCoord.size / TILE_PER_CHUNK_LINE;
 	
 	
 	AVectorI chunkCoord;
-	for (chunkCoord.x = startChunk.GetChunkCoord().x; chunkCoord.x < chunkCount.x; chunkCoord.x++)
+	for (chunkCoord.x = startChunk.GetChunkCoord().x; chunkCoord.x <= endChunk.GetChunkCoord().x; chunkCoord.x++)
 	{
-		for (chunkCoord.y = startChunk.GetChunkCoord().y; chunkCoord.y < chunkCount.y; chunkCoord.y++)
+		for (chunkCoord.y = startChunk.GetChunkCoord().y; chunkCoord.y <= endChunk.GetChunkCoord().y; chunkCoord.y++)
 		{
 			AuroraWorldChunk& chunk = GetChunk(chunkCoord);
-			ARectI dummy;
-			callback(chunk, dummy); // TODO
+			ARectI chunkTileRect = chunk.GetTileRect();
+			ARectI intesection = chunkTileRect.Intersection(rectTileCoord);
+			ARectI localIntesection = ARectI(intesection.position - chunkTileRect.position, intesection.size);
+			callback(chunk, localIntesection);
 		}
 	}
-
 
 }
 

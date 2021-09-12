@@ -1,6 +1,8 @@
 #ifndef AURORA_TYPES_H
 #define AURORA_TYPES_H
 
+#include "aurora_utils.h"
+
 namespace godot {
 namespace aurora {
 

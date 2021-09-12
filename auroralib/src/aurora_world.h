@@ -21,6 +21,7 @@ public:
 	void Step(float dt);
 
 	void SetTileMaterial(AVectorI tileCoord, TileMaterial material);
+	void SetTileMaterial(ARectI tileRect, TileMaterial material);
 
 	AuroraWorldChunk& GetChunkAndLocalCoord(AVectorI tileCoord, AVectorI& localChunkCoord);
 	AuroraWorldChunk& GetChunk(AVectorI chunkCoord);

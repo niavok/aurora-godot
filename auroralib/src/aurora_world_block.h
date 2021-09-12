@@ -2,6 +2,7 @@
 #define AURORA_WORLD_CHUNK_H
 
 #include <vector>
+#include <functional>
 
 #include "aurora_types.h"
 #include "aurora_utils.h"
@@ -14,12 +15,16 @@ class AuroraWorldBlock
 {
 public:
 	bool SetTileMaterial(AVectorI relativeTileCoord, TileMaterial material);
+	bool SetTileMaterial(ARectI relativeTileRect, TileMaterial material);
 	bool SetBlockMaterial(TileMaterial material);
 
 	bool IsHomogeneous() const;
 	AuroraWorldTile& GetTile(AVectorI relativeTileCoord);
 
 	TileMaterial GetBlockMaterial() const;
+
+	bool SelectTiles(ARectI rectTileCoord, std::function<bool(AuroraWorldTile&)> callback);
+
 
 private:
 

@@ -1,9 +1,11 @@
 #include "aurora_world_renderer.h"
 
 #include <Input.hpp>
+#include <InputEventMouseButton.hpp>
 #include <Vector2.hpp>
 #include <Vector3.hpp>
 #include <Viewport.hpp>
+#include <GlobalConstants.hpp>
 #include <cassert>
 
 namespace godot
@@ -13,6 +15,7 @@ namespace godot
 void WorldRenderer::_register_methods() {
     register_method("_process", &WorldRenderer::_process);
     register_method("_draw", &WorldRenderer::_draw);
+    register_method("_input", &WorldRenderer::_input);
 
     register_property<WorldRenderer, Vector2>("RENDER_DEBUG_OFFSET", &WorldRenderer::RENDER_DEBUG_OFFSET, Vector2(0,0));
     register_property<WorldRenderer, float>("RENDER_DEBUG_SCALE", &WorldRenderer::RENDER_DEBUG_SCALE, 4);
@@ -33,17 +36,19 @@ void WorldRenderer::FillTile(bool fill, Vector2 mousePosition)
 
     Vector2 relativeWorldPosition = (mousePosition - RENDER_DEBUG_OFFSET) / RENDER_DEBUG_SCALE;
 
-    int i = int(relativeWorldPosition.x / aurora::TILE_SIZE);
-    int j = int(relativeWorldPosition.y / aurora::TILE_SIZE);
+    AVectorI cursorCenterTilePosition(relativeWorldPosition / aurora::TILE_SIZE);
 
-    AVectorI tileCoord = m_localTileReferenceCoord + AVectorI(i, j);
+    
+    AVectorI cursorCenterTilePositionLocal = m_localTileReferenceCoord + cursorCenterTilePosition;
 
-    if (j < 0 || j >= m_world->GetTileCount().y)
-    {
-        return;
-    }
+    int cursorRadius = (m_cursorSize - 1) * 2 + 1;
+    AVectorI cursorSize(cursorRadius);
+        
+    AVectorI cursorCenterTopLeft = cursorCenterTilePositionLocal - AVectorI(m_cursorSize - 1);
+    ARectI cursorArea(cursorCenterTopLeft, cursorSize);
 
-    m_world->SetTileMaterial(tileCoord, aurora::TileMaterial::Aerock);
+
+    m_world->SetTileMaterial(cursorArea, fill ? aurora::TileMaterial::Aerock : TileMaterial::Air);
 }
 
 WorldRenderer::~WorldRenderer() {
@@ -61,6 +66,37 @@ void WorldRenderer::_init()
     m_worldStepDt = 0.001f;
     RENDER_DEBUG_DENSITY = 0.01f;
 }
+
+void WorldRenderer::_input(Variant event)
+{
+    Ref<InputEventMouseButton> mouseButtonEvent = event;
+    if (mouseButtonEvent->is_pressed())
+    {
+        if (mouseButtonEvent->get_button_index() == GlobalConstants::BUTTON_WHEEL_UP)
+        {
+            m_cursorSize++;
+        }
+
+        if (mouseButtonEvent->get_button_index() == GlobalConstants::BUTTON_WHEEL_DOWN)
+        {
+            if (m_cursorSize > 1)
+            {
+                m_cursorSize--;
+            }
+        }
+
+       /* 
+
+        if (emb.IsPressed()) {
+            if (emb.ButtonIndex == (int)ButtonList.WheelUp) {
+                GD.Print(emb.AsText());
+            }
+            if (emb.ButtonIndex == (int)ButtonList.WheelDown) {
+                GD.Print(emb.AsText());
+                */
+    }
+}
+
 
 void WorldRenderer::_process(float delta)
 {
@@ -94,7 +130,6 @@ void WorldRenderer::_process(float delta)
     {
         PrintWorldState();
     }
-
 
     if (input->is_mouse_button_pressed(1))
     {
@@ -196,336 +231,20 @@ void WorldRenderer::_draw()
             DrawChunk(chunk);
         });
 
+    // Draw Cursor
+    Viewport* viewport = get_viewport();
+    Vector2 origin = viewport->get_canvas_transform().get_origin();
 
 
-    //    Vector2 relativeWorldPosition = (mousePosition - RENDER_DEBUG_OFFSET) / RENDER_DEBUG_SCALE;
+    Vector2 mousePosition = get_local_mouse_position() - origin;
+    Vector2 relativeWorldPosition = (mousePosition - RENDER_DEBUG_OFFSET) / RENDER_DEBUG_SCALE;
 
-    //float blockSize = m_world->GetTileSize();
-
-    //int i = int(relativeWorldPosition.x / blockSize);
-    //int j = int(relativeWorldPosition.y / blockSize);
-
-    //AVectorI tileCoord = m_localTileReferenceCoord + AVectorI(i, j);
-
-
-    //auto DrawBorder = [&]()
-    //{
-    //    // First fill only
-    //    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
-    //    {
-    //        for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
-    //        {
-    //            Vector2 position((real_t)i * blockSize, (real_t)j * blockSize);
-    //            int index = m_fluidBox->BlockIndex(i, j);
-
-    //            if(m_fluidBox->m_blockConfig[index].isFill)
-    //            {
-    //                DrawRect(position, Vector2(blockSize, blockSize), Color(0.5f, 0.5f, 0.5f), true);
-    //            }
-    //        }
-    //    }
-
-    //    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
-    //    {
-    //        for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
-    //        {
-    //            Vector2 position((real_t)i * blockSize, (real_t)j * blockSize);
-    //            int index = m_fluidBox->BlockIndex(i, j);
-
-    //            FluidBox::BlockConfig& blockConfig = m_fluidBox->m_blockConfig[index];
-
-    //            if (!blockConfig.isTopConnected)
-    //            {
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //            }
-
-    //            if (!blockConfig.isBottomConnected)
-    //            {
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //            }
-
-    //            if (!blockConfig.isLeftConnected)
-    //            {
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //            }
-
-    //            if (!blockConfig.isRightConnected)
-    //            {
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //            }
-
-    //            /*uint8_t type = m_fluidBox->m_blockEdgeType[index];
-    //            switch (type)
-    //            {
-    //            case FluidBox::BlockEdge_VOID:
-    //            case FluidBox::BlockEdge_FILL:
-    //                break;
-    //            case FluidBox::BlockEdge_TOP_EDGE:
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_BOTTOM_EDGE:
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LEFT_EDGE:
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_RIGHT_EDGE:
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LOOPING_LEFT_VOID:
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(0.3f, 0.3f, 0.3f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LOOPING_RIGHT_VOID:
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(0.3f, 0.3f, 0.3f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LOOPING_LEFT_TOP_EDGE:
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(0.3f, 0.3f, 0.3f), true);
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LOOPING_LEFT_BOTTOM_EDGE:
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(0.3f, 0.3f, 0.3f), true);
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LOOPING_RIGHT_TOP_EDGE:
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(0.3f, 0.3f, 0.3f), true);
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_LOOPING_RIGHT_BOTTOM_EDGE:
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(0.3f, 0.3f, 0.3f), true);
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_TOP_LEFT_CORNER:
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_TOP_RIGHT_CORNER:
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_BOTTOM_LEFT_CORNER:
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                DrawLine(position, position + Vector2(0, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_BOTTOM_RIGHT_CORNER:
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                DrawLine(position + Vector2(blockSize, 0), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            case FluidBox::BlockEdge_HORIZONTAL_PIPE:
-    //                DrawLine(position, position + Vector2(blockSize, 0), Color(1.0f, 1.f, 1.0f), true);
-    //                DrawLine(position + Vector2(0, blockSize), position + Vector2(blockSize, blockSize), Color(1.0f, 1.f, 1.0f), true);
-    //                break;
-    //            default:
-    //                DrawRect(position, Vector2(blockSize, blockSize), Color(1.f, 0.f, 0.f, 0.5f), true);
-    //            }*/
-    //        }
-    //    }
-
-    //    if (false)
-    //    {
-    //        // Velocity type check
-    //        for (int j = 0; j < m_fluidBox->m_horizontalVelocityCountY; j++)
-    //        {
-    //            for (int i = 0; i < m_fluidBox->m_horizontalVelocityCountX; i++)
-    //            {
-    //                Vector2 worldPosition(blockSize * i, blockSize * 0.5f + blockSize * j);
-    //                Vector2 drawPosition = WorldPositionToDraw(worldPosition);
-    //                int index = i + j * m_fluidBox->m_horizontalVelocityCountX;
-    //                Color color;
-
-    //                uint8_t type = m_fluidBox->m_horizontalVelocityType[index];
-
-    //                if (type == FluidBox::Velocity_FREE)
-    //                {
-    //                    continue;
-    //                }
-    //                else if (type == FluidBox::Velocity_ZERO)
-    //                {
-    //                    color = Color(1.f, 0.f, 0.f, 1.0);
-    //                }
-    //                else if (type == FluidBox::Velocity_LOOPING_LEFT)
-    //                {
-    //                    color = Color(0.f, 1.f, 0.f, 1.0);
-    //                }
-    //                else if (type == FluidBox::Velocity_LOOPING_RIGHT)
-    //                {
-    //                    color = Color(1.f, 0.f, 1.f, 1.0);
-    //                }
-
-    //                draw_line(drawPosition + Vector2(-1, 0), drawPosition + Vector2(1, 0), color, 1.f);
-    //            }
-    //        }
-
-    //        for (int j = 0; j < m_fluidBox->m_verticalVelocityCountY; j++)
-    //        {
-    //            for (int i = 0; i < m_fluidBox->m_verticalVelocityCountX; i++)
-    //            {
-    //                Vector2 worldPosition(blockSize * 0.5f + blockSize * i, blockSize * j);
-    //                Vector2 drawPosition = WorldPositionToDraw(worldPosition);
-    //                int index = i + j * m_fluidBox->m_verticalVelocityCountX;
-    //                Color color;
-
-    //                uint8_t type = m_fluidBox->m_verticalVelocityType[index];
-
-    //                if (type == FluidBox::Velocity_FREE)
-    //                {
-    //                    continue;
-    //                }
-    //                else if (type == FluidBox::Velocity_ZERO)
-    //                {
-    //                    color = Color(1.f, 0.f, 0.f, 1.0);
-    //                }
-    //                else if (type == FluidBox::Velocity_LOOPING_LEFT)
-    //                {
-    //                    color = Color(0.f, 1.f, 0.f, 1.0);
-    //                }
-    //                else if (type == FluidBox::Velocity_LOOPING_RIGHT)
-    //                {
-    //                    color = Color(1.f, 0.f, 1.f, 1.0);
-    //                }
-
-    //                draw_line(drawPosition + Vector2(-1, 0), drawPosition + Vector2(1, 0), color, 1.f);
-    //            }
-    //        }
-    //    }
-    //};
-
-    //if (true)
-    //{
-    //    DrawBorder();
-    //   
-
-    //    if (true)
-    //    {
-    //        float* horizontalVelocity = m_fluidBox->m_horizontalVelocityBuffer[m_fluidBox->m_activeVelocityBufferIndex];
-    //        float* verticalVelocity = m_fluidBox->m_verticalVelocityBuffer[m_fluidBox->m_activeVelocityBufferIndex];
-    //        int horizontalVelocityCountX = m_fluidBox->m_horizontalVelocityCountX;
-    //        int verticalVelocityCountX = m_fluidBox->m_verticalVelocityCountX;
-
-    //        auto LeftHorizontalVelocity = [horizontalVelocityCountX, horizontalVelocity](int blockX, int blockY) -> float {
-    //            int velocityIndex = blockX + horizontalVelocityCountX * blockY;
-    //            return horizontalVelocity[velocityIndex];
-    //        };
-
-    //        auto RightHorizontalVelocity = [horizontalVelocityCountX, horizontalVelocity](int blockX, int blockY) -> float {
-    //            int velocityIndex = blockX + horizontalVelocityCountX * blockY + 1;
-    //            return horizontalVelocity[velocityIndex];
-    //        };
-
-    //        auto RightHorizontalVelocityLooping = [horizontalVelocityCountX, horizontalVelocity](int blockX, int blockY) -> float {
-    //            int velocityIndex = blockX + horizontalVelocityCountX * (blockY - 1) + 1;
-    //            return horizontalVelocity[velocityIndex];
-    //        };
-
-    //        auto TopVerticalVelocity = [verticalVelocityCountX, verticalVelocity](int blockX, int blockY) -> float {
-    //            int velocityIndex = blockX + verticalVelocityCountX * blockY;
-    //            return verticalVelocity[velocityIndex];
-    //        };
-
-    //        auto BottomVerticalVelocity = [verticalVelocityCountX, verticalVelocity](int blockX, int blockY) -> float {
-    //            int velocityIndex = blockX + verticalVelocityCountX * (blockY + 1);
-    //            return verticalVelocity[velocityIndex];
-    //        };
-
-    //        // Velocity
-    //        int vStep = 2;
-    //        for (int j = 0; j < m_fluidBox->m_blockCountY; j+= vStep)
-    //        {
-    //            for (int i = 0; i < m_fluidBox->m_blockCountX; i+=vStep)
-    //            {
-    //                int index = m_fluidBox->BlockIndex(i, j);
-
-    //                if (m_fluidBox->m_blockConfig[index].isFill)
-    //                {
-    //                    continue;
-    //                }
-
-    //                Vector2 position((real_t)i* blockSize, (real_t)j* blockSize);
-    //                Vector2 center_pos = position + Vector2(blockSize, blockSize) * 0.5f;
-
-
-    //                float leftVelocity = LeftHorizontalVelocity(i, j);
-    //                float rightVelocity;
-    //                if (i == m_fluidBox->m_blockCountX - 1 && m_fluidBox->m_isHorizontalLoop)
-    //                {
-    //                    rightVelocity  = RightHorizontalVelocityLooping(i, j);
-    //                }
-    //                else
-    //                {
-    //                    rightVelocity = RightHorizontalVelocity(i, j);
-    //                }
-
-    //                float topVelocity = TopVerticalVelocity(i, j);
-    //                float bottomVelocity = BottomVerticalVelocity(i, j);
-    //                
-    //                Vector2 velocity(0.5f * (leftVelocity + rightVelocity), 0.5f * (topVelocity + bottomVelocity));
-
-
-    //                //if (velocity.length_squared() > 100)
-    //                //{
-    //                //    int plop = 1;
-    //                //    for (int x = 0; x < 50; x++)
-    //                //    {
-    //                //        printf("%d: %10.15g -> %10.15g \n", x, RightHorizontalVelocity(i + x, j), RightHorizontalVelocity(i + x, j + 1));
-    //                //    }
-
-
-    //                //}
-
-    //                if (velocity.length_squared() < 1e-5)
-    //                {
-    //                    continue;
-    //                }
-
-    //                float velocityAngle = velocity.angle();
-
-    //                float red = 0.5f * (1 + sinf(velocityAngle));
-    //                float green = 0.5f * (1 + sinf(velocityAngle + 2 * float(Math_PI) / 3.0f)); //  + 60°
-    //                float blue = 0.5f * (1 + sinf(velocityAngle + 4 * float(Math_PI) / 3.0f)); //  + 120°
-
-
-    //                Color color(red, green, blue);
-
-    //                Vector2 velocity_pos = center_pos + velocity * RENDER_DEBUG_VELOCITY_SCALE;
-
-    //                if (WorldSizeToDraw(velocity * RENDER_DEBUG_VELOCITY_SCALE).length_squared() > 1.f)
-    //                {
-    //                    DrawLine(center_pos, velocity_pos, color, 1);
-    //                }
-    //            }
-    //        }
-    //    }
-
-    //    drawPosition += WorldSizeToDraw(Vector2(0, m_fluidBox->m_blockCountY * m_fluidBox->m_blockSize));
-
-    //    DrawBorder();
-
-    //    // Content
-    //    FluidBox::Content* content = m_fluidBox->m_contentBuffer[m_fluidBox->m_activeContentBufferIndex];
-    //    float opacityCoeff = RENDER_DEBUG_DENSITY;
-
-    //    for (int j = 0; j < m_fluidBox->m_blockCountY; j++)
-    //    {
-    //        for (int i = 0; i < m_fluidBox->m_blockCountX; i++)
-    //        {
-    //            int index = m_fluidBox->BlockIndex(i, j);
-
-    //            FluidBox::Content& blockContent = content[index];
-
-    //            Vector3 composition(blockContent.totalContent.density0, blockContent.totalContent.density1, blockContent.totalContent.density2);
-
-    //            float density = composition.x + composition.y + composition.z;
-
-    //            Vector3 dyeColor = composition.normalized();
-
-
-    //            Color tileColor(dyeColor.x, dyeColor.y, dyeColor.z, density * opacityCoeff);
-
-    //            Vector2 position((real_t)i* blockSize, (real_t)j* blockSize);
-
-    //            DrawRect(position, Vector2(blockSize, blockSize), tileColor, true);
-    //        }
-    //    }
-    //}
+    AVectorI cursorCenterTilePosition(relativeWorldPosition / aurora::TILE_SIZE);
+    int cursorRadius = (m_cursorSize - 1) * 2 + 1;
+    AVectorI cursorArea(cursorRadius, cursorRadius);
+    AVectorI cursorCenterTopLeft = cursorCenterTilePosition - AVectorI(m_cursorSize-1, m_cursorSize-1);
+    
+    DrawRect(cursorCenterTopLeft, cursorArea, Color(0.f, 1.f, 0), false);
 
 }
 
@@ -536,7 +255,7 @@ Color WorldRenderer::GetMaterialDebugColor(TileMaterial material, bool border)
     switch (material)
     {
     case TileMaterial::Air:
-        materialColor = Color(0.5f, 0.6f, 0.7f, 0.1);
+        materialColor = Color(0.5f, 0.6f, 0.7f, 0.1f);
         break;
     case TileMaterial::Aerock:
         materialColor = Color(0.3f, 0.1f, 0.1f, 1.f);

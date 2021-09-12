@@ -21,17 +21,19 @@ void AuroraWorldChunk::SetTileMaterial(AVectorI relativeTileCoord, TileMaterial 
 		}
 		else
 		{
-			SpitChunk();
-			AVectorI localBlockCoord;
-			AuroraWorldBlock& block = GetBlockAndLocalCoord(relativeTileCoord, localBlockCoord);
-			block.SetTileMaterial(localBlockCoord, material);
+			SplitChunk();
+			AVectorI localBlockTileCoord;
+			AVectorI blockCoord;
+			AuroraWorldBlock& block = GetBlockAndLocalCoord(relativeTileCoord, localBlockTileCoord, blockCoord);
+			block.SetTileMaterial(localBlockTileCoord, material);
 		}
 	}
 	else
 	{
-		AVectorI localBlockCoord;
-		AuroraWorldBlock& block = GetBlockAndLocalCoord(relativeTileCoord, localBlockCoord);
-		if (block.SetTileMaterial(localBlockCoord, material))
+		AVectorI localBlockTileCoord;
+		AVectorI blockCoord;
+		AuroraWorldBlock& block = GetBlockAndLocalCoord(relativeTileCoord, localBlockTileCoord, blockCoord);
+		if (block.SetTileMaterial(localBlockTileCoord, material))
 		{
 			if (!block.IsHomogeneous())
 			{
@@ -41,7 +43,64 @@ void AuroraWorldChunk::SetTileMaterial(AVectorI relativeTileCoord, TileMaterial 
 	}
 }
 
-void AuroraWorldChunk::SpitChunk()
+void AuroraWorldChunk::SetTileMaterial(ARectI relativeTileRect, TileMaterial material)
+{
+	ARectI WholeChunk(AVectorI(0), AVectorI(TILE_PER_CHUNK_LINE));
+
+
+	if (relativeTileRect == WholeChunk)
+	{
+		if (IsHomogeneous())
+		{
+			if (GetChunkMaterial() == material)
+			{
+				// Nothing to do
+			}
+			else
+			{
+				m_chunkMaterial = material;
+			}
+		}
+		else
+		{
+			// Force merge
+			m_blocks.clear();
+			m_blocks.shrink_to_fit();
+			m_isHomogeneous = true;
+			m_chunkMaterial = material;
+		}
+	}
+	else
+	{
+		if (IsHomogeneous())
+		{
+			if (GetChunkMaterial() == material)
+			{
+				// Nothing to do
+				return;
+			}
+			else
+			{
+				SplitChunk();
+			}
+		}
+
+		SelectBlocks(relativeTileRect, [this, material](AuroraWorldBlock& block, ARectI& localRect)
+			{
+				block.SetTileMaterial(localRect, material);
+			});
+
+		if (!IsHomogeneous())
+		{
+			TryMergeChunk();
+		}
+	}
+
+	
+}
+
+
+void AuroraWorldChunk::SplitChunk()
 {
 	assert(m_isHomogeneous);
 
@@ -81,20 +140,20 @@ void AuroraWorldChunk::TryMergeChunk()
 	m_isHomogeneous = true;
 }
 
-AuroraWorldBlock& AuroraWorldChunk::GetBlockAndLocalCoord(AVectorI relativeTileCoord, AVectorI& localBlockCoord)
+AuroraWorldBlock& AuroraWorldChunk::GetBlockAndLocalCoord(AVectorI relativeTileCoord, AVectorI& localBlockTileCoord, AVectorI& blockCoord)
 {
-	localBlockCoord.x = (relativeTileCoord.x % TILE_PER_BLOCK_LINE);
-	localBlockCoord.y = (relativeTileCoord.y % TILE_PER_BLOCK_LINE);
+	localBlockTileCoord.x = (relativeTileCoord.x % TILE_PER_BLOCK_LINE);
+	localBlockTileCoord.y = (relativeTileCoord.y % TILE_PER_BLOCK_LINE);
 
-	int blockIndexX = relativeTileCoord.x / BLOCK_PER_CHUNK_LINE;
-	int blockIndexY = relativeTileCoord.y / BLOCK_PER_CHUNK_LINE;
+	blockCoord.x = relativeTileCoord.x / BLOCK_PER_CHUNK_LINE;
+	blockCoord.y = relativeTileCoord.y / BLOCK_PER_CHUNK_LINE;
 
-	assert(blockIndexX >= 0);
-	assert(blockIndexX < BLOCK_PER_CHUNK_LINE);
-	assert(blockIndexY >= 0);
-	assert(blockIndexY < BLOCK_PER_CHUNK_LINE);
+	assert(blockCoord.x >= 0);
+	assert(blockCoord.x < BLOCK_PER_CHUNK_LINE);
+	assert(blockCoord.y >= 0);
+	assert(blockCoord.y < BLOCK_PER_CHUNK_LINE);
 
-	return m_blocks[blockIndexX + blockIndexY * BLOCK_PER_CHUNK_LINE];
+	return m_blocks[blockCoord.x + blockCoord.y * BLOCK_PER_CHUNK_LINE];
 }
 
 
@@ -103,6 +162,33 @@ AuroraWorldBlock& AuroraWorldChunk::GetBlock(AVectorI blockCoord)
 {
 	assert(!m_isHomogeneous);
 	return m_blocks[blockCoord.x + blockCoord.y * BLOCK_PER_CHUNK_LINE];
+}
+
+void AuroraWorldChunk::SelectBlocks(ARectI rectTileCoord, std::function<void(AuroraWorldBlock&, ARectI&)> callback)
+{
+	AVectorI localStartBlockCoord;
+	AVectorI startBlockCoord;
+	AuroraWorldBlock& startBlock = GetBlockAndLocalCoord(rectTileCoord.position, localStartBlockCoord, startBlockCoord);
+
+	AVectorI localEndBlockCoord;
+	AVectorI endBlockCoord;
+	AuroraWorldBlock& endBlock = GetBlockAndLocalCoord(rectTileCoord.position + rectTileCoord.size - AVectorI(1), localEndBlockCoord, endBlockCoord);
+
+	AVectorI chunkCount = AVectorI(1, 1) + rectTileCoord.size / TILE_PER_CHUNK_LINE;
+
+
+	AVectorI blockCoord;
+	for (blockCoord.x = startBlockCoord.x; blockCoord.x <= endBlockCoord.x; blockCoord.x++)
+	{
+		for (blockCoord.y = startBlockCoord.y; blockCoord.y <= endBlockCoord.y; blockCoord.y++)
+		{
+			AuroraWorldBlock& block = GetBlock(blockCoord);
+			ARectI blockTileRect(blockCoord * TILE_PER_BLOCK_LINE, TILE_PER_BLOCK_LINE);
+			ARectI intesection = blockTileRect.Intersection(rectTileCoord);
+			ARectI localIntesection = ARectI(intesection.position - blockTileRect.position, intesection.size);
+			callback(block, localIntesection);
+		}
+	}
 }
 
 

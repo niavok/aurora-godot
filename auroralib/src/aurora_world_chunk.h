@@ -2,6 +2,7 @@
 #define AURORA_WORLD_BLOCK_H
 
 #include <vector>
+#include <functional>
 
 #include "aurora_types.h"
 #include "aurora_utils.h"
@@ -15,15 +16,23 @@ class AuroraWorldChunk
 public:
 	void Init(AVectorI chunkCoord);
 	void SetTileMaterial(AVectorI relativeTileCoord, TileMaterial material);
-	AuroraWorldBlock& GetBlockAndLocalCoord(AVectorI relativeTileCoord, AVectorI& localBlockCoord);
+	void SetTileMaterial(ARectI relativeTileRect, TileMaterial material);
+	AuroraWorldBlock& GetBlockAndLocalCoord(AVectorI relativeTileCoord, AVectorI& localBlockTileCoord, AVectorI& blockCoord);
 	AVectorI const& GetChunkCoord() const { return m_chunkCoord; }
+	ARectI GetTileRect() const { return ARectI(m_chunkCoord, AVectorI(TILE_PER_CHUNK_LINE)); }
+
 	bool IsHomogeneous() const { return m_isHomogeneous; }
 	TileMaterial GetChunkMaterial() const { return m_chunkMaterial; }
 	AuroraWorldBlock& GetBlock(AVectorI blockCoord);
 
+	void SelectBlocks(ARectI rectTileCoord, std::function<void(AuroraWorldBlock&, ARectI&)> callback);
+
+
+
+
 private:
 
-	void SpitChunk();
+	void SplitChunk();
 	void TryMergeChunk();
 
 	AVectorI m_chunkCoord;

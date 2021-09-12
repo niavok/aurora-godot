@@ -38,6 +38,66 @@ bool AuroraWorldBlock::SetTileMaterial(AVectorI relativeTileCoord, TileMaterial 
 
 }
 
+bool AuroraWorldBlock::SetTileMaterial(ARectI relativeTileRect, TileMaterial material)
+{
+	ARectI WholeBlock(AVectorI(0), AVectorI(TILE_PER_BLOCK));
+
+
+	if (relativeTileRect == WholeBlock)
+	{
+		if (IsHomogeneous())
+		{
+			if (GetBlockMaterial() == material)
+			{
+				// Nothing to do
+			}
+			else
+			{
+				m_blockMaterial = material;
+				return true;
+			}
+		}
+		else
+		{
+			// Force merge
+			m_tiles.clear();
+			m_tiles.shrink_to_fit();
+			m_isHomogeneous = true;
+			m_blockMaterial = material;
+			return true;
+		}
+	}
+	else
+	{
+		if (IsHomogeneous())
+		{
+			if (GetBlockMaterial() == material)
+			{
+				// Nothing to do
+				return false;
+			}
+			else
+			{
+				SplitBlock();
+			}
+		}
+
+		bool changed = SelectTiles(relativeTileRect, [this, material](AuroraWorldTile& tile)
+			{
+				return tile.SetTileMaterial(material);
+			});
+
+		if (changed)
+		{
+			TryMergeBlock();
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
 bool AuroraWorldBlock::IsHomogeneous() const
 {
 	return m_isHomogeneous;
@@ -115,6 +175,21 @@ bool AuroraWorldBlock::SetBlockMaterial(TileMaterial material)
 }
 
 
+bool AuroraWorldBlock::SelectTiles(ARectI rectTileCoord, std::function<bool(AuroraWorldTile&)> callback)
+{
+	bool changed = false;
+	AVectorI tileCoord;
+	for (tileCoord.x = rectTileCoord.position.x; tileCoord.x < rectTileCoord.position.x + rectTileCoord.size.x; tileCoord.x++)
+	{
+		for (tileCoord.y = rectTileCoord.position.y; tileCoord.y < rectTileCoord.position.y + rectTileCoord.size.y; tileCoord.y++)
+		{
+			AuroraWorldTile& tile = GetTile(tileCoord);
+			changed |= callback(tile);
+		}
+	}
+
+	return changed;
+}
 
 
 }

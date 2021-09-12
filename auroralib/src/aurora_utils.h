@@ -10,7 +10,9 @@ namespace aurora {
 struct AVectorI
 {
 	AVectorI();
+	AVectorI(Vector2 vector);
 	AVectorI(int x, int y);
+	AVectorI(int xy);
 
 	int x;
 	int y;
@@ -23,10 +25,18 @@ struct AVectorI
 	Vector2 operator*(float o) const;
 	AVectorI operator*(int o) const;
 	AVectorI operator/(int o) const;
+	bool operator==(AVectorI const& o) const;
 };
 
 struct ARectI
 {
+	ARectI();
+	ARectI(AVectorI iPosition, AVectorI iSize);
+
+	ARectI Intersection(ARectI o) const;
+
+	bool operator==(ARectI const& o) const;
+
 	AVectorI position;
 	AVectorI size;
 };
